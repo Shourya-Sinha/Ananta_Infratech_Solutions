@@ -89,3 +89,56 @@ export function useCreateWorker() {
     onSuccess: invalidate
   });
 }
+
+/**
+ * Super Admin "Add worker": one-shot registration (login account + worker
+ * profile + optional initial site). The response carries the temporary
+ * password exactly once for handover to the worker.
+ */
+export function useRegisterWorker() {
+  const invalidate = useInvalidateWorkers();
+  return useMutation({
+    mutationFn: async (input) => unwrap(api.post("/workers/register", input)),
+    onSuccess: invalidate
+  });
+}
+
+export function useWorkerDocuments(workerId) {
+  return useQuery({
+    queryKey: ["worker-documents", workerId],
+    queryFn: async () => unwrap(api.get(`/workers/${workerId}/documents`)),
+    enabled: Boolean(workerId)
+  });
+}
+
+function useInvalidateWorkerDocs(workerId) {
+  const qc = useQueryClient();
+  return () => {
+    qc.invalidateQueries({ queryKey: ["worker-documents", workerId] });
+    qc.invalidateQueries({ queryKey: ["workers"] });
+  };
+}
+
+/** Admin uploads a document on the worker's behalf (server uploads to ImageKit). */
+export function useUploadWorkerDocument(workerId) {
+  const invalidate = useInvalidateWorkerDocs(workerId);
+  return useMutation({
+    mutationFn: async ({ file, type }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", type);
+      return unwrap(api.post(`/workers/${workerId}/documents`, formData));
+    },
+    onSuccess: invalidate
+  });
+}
+
+/** Approve or reject one document; the worker is notified either way. */
+export function useVerifyWorkerDocument(workerId) {
+  const invalidate = useInvalidateWorkerDocs(workerId);
+  return useMutation({
+    mutationFn: async ({ docId, approve, rejectionReason }) =>
+    unwrap(api.post(`/workers/${workerId}/documents/${docId}/verify`, { approve, rejectionReason })),
+    onSuccess: invalidate
+  });
+}

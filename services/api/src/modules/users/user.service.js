@@ -64,7 +64,11 @@ exports.UserService = {
       key: input.roleKey
     });
     if (!role) throw _AppError.AppError.validation(`Unknown role: ${input.roleKey}`);
-    const temporaryPassword = _nodeCrypto.default.randomBytes(9).toString("base64url");
+    // The creating admin may choose the initial password (e.g. worker
+    // registration via the Admin Web UI where the credentials are handed
+    // over in person); when omitted a random one is generated and returned
+    // exactly once.
+    const temporaryPassword = input.password ?? _nodeCrypto.default.randomBytes(9).toString("base64url");
     const passwordHash = await _argon.default.hash(temporaryPassword);
     const user = await _User.User.create({
       role: role._id,

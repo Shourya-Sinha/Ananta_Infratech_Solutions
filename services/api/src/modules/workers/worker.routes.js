@@ -12,6 +12,8 @@ var _rbac = require("../../middleware/rbac");
 var _errorHandler = require("../../middleware/errorHandler");
 var _AppError = require("../../errors/AppError");
 var _sharedTypes = require("@ananta/shared-types");
+var _validation = require("@ananta/validation");
+var _notification = require("../notifications/notification.service");
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 const upload = (0, _multer.default)({
   storage: _multer.default.memoryStorage(),
@@ -190,6 +192,24 @@ workersRouter.post("/", (0, _rbac.requirePermission)("worker.create"), (0, _erro
   res.status(201).json(body);
 }));
 
+/**
+ * Registration Steps 1–3 in a single admin action: "Add worker" from the
+ * Admin Web UI. Creates the WORKER User account (ACTIVE + phoneVerified —
+ * no mobile self-registration/OTP needed) and the WorkerProfile together,
+ * optionally assigning the initial site. Responds with the generated (or
+ * admin-chosen) temporary password exactly once, so the Super Admin can
+ * hand the credentials to the worker in person.
+ */
+workersRouter.post("/register", (0, _rbac.requirePermission)("worker.create"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const input = _validation.workerRegisterSchema.parse(req.body);
+  const result = await _worker.WorkerService.registerByAdmin(input, req.auth.userId);
+  const body = {
+    success: true,
+    data: result
+  };
+  res.status(201).json(body);
+}));
+
 // --- Registration Step 4: document upload (admin/manager on behalf of worker) ---
 
 workersRouter.post("/:id/documents", (0, _rbac.requirePermission)("worker.create"), upload.single("file"), (0, _errorHandler.asyncHandler)(async (req, res) => {
@@ -209,6 +229,52 @@ workersRouter.post("/:id/documents", (0, _rbac.requirePermission)("worker.create
     data: doc
   };
   res.status(201).json(body);
+}));
+
+/** Admin/manager listing of a worker's uploaded documents (review before verification). */
+workersRouter.get("/:id/documents", (0, _rbac.requirePermission)("worker.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const worker = await _worker.WorkerService.getById(req.params.id);
+  const docs = await _document.DocumentService.listForOwner(worker.user._id.toString());
+  const body = {
+    success: true,
+    data: docs
+  };
+  res.json(body);
+}));
+
+/**
+ * Per-document verification decision (Registration Step 5, granular form):
+ * approve or reject ONE document. The worker-level /verify-documents step
+ * requires every uploaded document to be individually VERIFIED first —
+ * without this route that could never happen (DocumentService.verify had no
+ * HTTP surface at all, so the whole verification chain dead-ended even for
+ * mobile-uploaded documents). The ownership lookup guarantees an admin can
+ * only act on documents that actually belong to this worker's account.
+ */
+workersRouter.post("/:id/documents/:docId/verify", (0, _rbac.requirePermission)("worker.verify"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const {
+    approve,
+    rejectionReason
+  } = _validation.documentVerifySchema.parse(req.body);
+  const worker = await _worker.WorkerService.getById(req.params.id);
+  const ownerId = worker.user._id.toString();
+  const owned = await _document.DocumentService.listForOwner(ownerId);
+  const doc = owned.find((d) => d._id.toString() === req.params.docId);
+  if (!doc) throw _AppError.AppError.notFound("Document not found for this worker.");
+  const updated = await _document.DocumentService.verify(doc._id.toString(), req.auth.userId, approve, rejectionReason);
+  // Tell the worker in real time — they are otherwise staring at a PENDING
+  // badge in their app with no idea anyone looked at it.
+  await _notification.NotificationService.send({
+    recipient: ownerId,
+    type: approve ? "DOCUMENT_VERIFIED" : "DOCUMENT_REJECTED",
+    title: approve ? `Your ${doc.type.replace(/_/g, " ").toLowerCase()} was verified` : `Your ${doc.type.replace(/_/g, " ").toLowerCase()} needs attention`,
+    body: approve ? "The document you uploaded has been verified." : rejectionReason
+  });
+  const body = {
+    success: true,
+    data: updated
+  };
+  res.json(body);
 }));
 
 // --- Verification workflow ----------------------------------------------
