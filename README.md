@@ -80,7 +80,10 @@ self-service document upload) · Documents (ImageKit) · Attendance
 Salary engine (pure calculation + ledger posting + monthly rollup) ·
 Payroll (calculate/finalize/mark-paid/adjustment-on-finalized-month) ·
 Advances (full REQUESTED→PAID lifecycle) · Kharchi (REQUESTED→APPROVED
-with immediate ledger deduction) · Site Finance
+with immediate ledger deduction) · Super Admin direct add
+(POST /advances/direct, POST /kharchi/direct — one-step creation for any
+worker under `advance.directAdd`/`kharchi.directAdd`, auto-approved with the
+salary deduction posted through the standard pipeline) · Site Finance
 (capital/income/expense/reversal/site & company profit-loss) ·
 Notifications (in-app + real Expo push dispatch) · SMS gateway
 (MSG91-backed, dev-mode fallback) · Settings (salary rules, work types) ·
@@ -288,7 +291,7 @@ production build.
 
 ## Dashboard KPI cards are clickable (deep-linked to full detail)
 
-Every stat box on the Admin Web dashboard is a real link, not just a
+Every stat box on the Admin Web dashboard is a reaoard is a real link, not just a
 number:
 - **Active sites** → Sites list, pre-filtered to `ACTIVE`
 - **Active workers** / **Pending verification** → Workers list,

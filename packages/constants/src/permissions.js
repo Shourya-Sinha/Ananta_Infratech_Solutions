@@ -105,6 +105,11 @@ const PERMISSIONS = exports.PERMISSIONS = [
   group: "Advance",
   description: "View advance requests"
 },
+{
+  key: "advance.directAdd",
+  group: "Advance",
+  description: "Directly add an advance for any worker without a request (Super Admin)"
+},
 // Kharchi
 {
   key: "kharchi.create",
@@ -122,6 +127,11 @@ const PERMISSIONS = exports.PERMISSIONS = [
   key: "kharchi.read",
   group: "Kharchi",
   description: "View Kharchi requests"
+},
+{
+  key: "kharchi.directAdd",
+  group: "Kharchi",
+  description: "Directly add a Kharchi for any worker without a request (Super Admin)"
 },
 // Sites
 {

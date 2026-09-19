@@ -37,6 +37,70 @@ exports.AdvanceService = {
     });
     return request;
   },
+  /**
+   * Super Admin direct add: creates an advance for any worker with no
+   * request/approval cycle. The entry is stored APPROVED (or PAID when
+   * markPaidNow, the default) and the salary deduction is posted through the
+   * same SalaryService.postDeduction pipeline the request flow uses — so
+   * payroll totals, net salary, ledger and reports all update identically.
+   */
+  async createDirect(input) {
+    const profile = await _WorkerProfile.WorkerProfile.findById(input.workerId);
+    if (!profile) throw _AppError.AppError.notFound("Worker not found");
+    const siteId = input.siteId ?? (profile.currentSite ? profile.currentSite.toString() : undefined);
+    if (!siteId) {
+      throw _AppError.AppError.validation("This worker has no site assigned. Select a site for the advance's salary-ledger entry.");
+    }
+    const amountPaise = (0, _utils.rupeesToPaise)(input.amountRupees);
+    const markPaidNow = input.markPaidNow !== false;
+    const request = await _Requests.AdvanceRequest.create({
+      worker: profile._id,
+      amountPaise,
+      reason: input.reason,
+      requestedDate: new Date(input.requestedDate),
+      submittedBy: input.actorId,
+      status: markPaidNow ? "PAID" : "APPROVED",
+      approvedAmountPaise: amountPaise,
+      approvedBy: input.actorId,
+      isDirect: true
+    });
+    if (markPaidNow) {
+      await _salary.SalaryService.postDeduction({
+        workerId: profile._id.toString(),
+        siteId,
+        type: "ADVANCE_DEDUCTION",
+        amountPaise,
+        description: `Advance payout (added by Super Admin) — ${input.reason}`,
+        reference: request._id.toString(),
+        actorId: input.actorId
+      });
+    }
+    await _audit.AuditService.log({
+      actor: input.actorId,
+      action: "ADVANCE_DIRECT_ADDED",
+      targetType: "AdvanceRequest",
+      targetId: request._id.toString(),
+      after: {
+        amountRupees: input.amountRupees,
+        status: request.status,
+        siteId
+      }
+    });
+    await _notification.NotificationService.send({
+      recipient: profile.user.toString(),
+      type: markPaidNow ? "ADVANCE_PAID" : "ADVANCE_APPROVED",
+      title: markPaidNow ? "An advance has been paid to you." : "An advance has been approved for you.",
+      body: `Amount: ₹${input.amountRupees}.${markPaidNow ? " It will be deducted from your salary." : ""}`
+    });
+    (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).to(_sharedTypes.ROOMS.worker(profile._id.toString())).emit(_sharedTypes.SOCKET_EVENTS.ADVANCE_CREATED, {
+      requestId: request._id.toString(),
+      workerId: profile._id.toString()
+    });
+    (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).to(_sharedTypes.ROOMS.worker(profile._id.toString())).emit(markPaidNow ? _sharedTypes.SOCKET_EVENTS.ADVANCE_PAID : _sharedTypes.SOCKET_EVENTS.ADVANCE_APPROVED, {
+      requestId: request._id.toString()
+    });
+    return request;
+  },
   async approve(requestId, approvedAmountRupees, approvedBy) {
     const request = await _Requests.AdvanceRequest.findById(requestId);
     if (!request) throw _AppError.AppError.notFound("Advance request not found");
@@ -113,11 +177,19 @@ exports.AdvanceService = {
     if (request.status !== "APPROVED" && request.status !== "PARTIALLY_APPROVED") {
       throw _AppError.AppError.conflict(`Cannot mark paid a request in status ${request.status}.`);
     }
+    let resolvedSiteId = siteId;
+    if (!resolvedSiteId) {
+      const profile = await _WorkerProfile.WorkerProfile.findById(request.worker);
+      resolvedSiteId = profile?.currentSite ? profile.currentSite.toString() : undefined;
+      if (!resolvedSiteId) {
+        throw _AppError.AppError.validation("Worker has no site assigned; provide a siteId for the salary-ledger entry.");
+      }
+    }
     request.status = "PAID";
     await request.save();
     await _salary.SalaryService.postDeduction({
       workerId: request.worker.toString(),
-      siteId,
+      siteId: resolvedSiteId,
       type: "ADVANCE_DEDUCTION",
       amountPaise: request.approvedAmountPaise ?? request.amountPaise,
       description: `Advance payout — ${request.reason}`,

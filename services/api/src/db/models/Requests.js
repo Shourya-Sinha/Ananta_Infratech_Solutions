@@ -42,6 +42,13 @@ const advanceRequestSchema = new _mongoose.Schema({
   approvedAmountPaise: {
     type: Number
   },
+  // True when the entry was created directly by a Super Admin via the
+  // "direct add" endpoint, bypassing the request → approve → pay cycle.
+  isDirect: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
   rejectionReason: {
     type: String
   },
@@ -99,6 +106,13 @@ const kharchiRequestSchema = new _mongoose.Schema({
     type: String,
     enum: _sharedTypes.REQUEST_STATUS,
     default: "REQUESTED",
+    index: true
+  },
+  // True when the entry was created directly by a Super Admin via the
+  // "direct add" endpoint, bypassing the request → approve cycle.
+  isDirect: {
+    type: Boolean,
+    default: false,
     index: true
   },
   approvedBy: {
