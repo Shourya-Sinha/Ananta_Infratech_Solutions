@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-paper text-graphite-900 font-body antialiased;
+  }
+
+  * {
+    @apply border-steel-200;
+  }
+
+  /* Signature focus ring — visible keyboard focus everywhere, per accessibility floor */
+  :focus-visible {
+    outline: 2px solid theme("colors.amber.DEFAULT");
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: theme("colors.amber.50");
+  }
+
+  table {
+    @apply font-mono text-sm tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* The ledger-rule: signature amber tick mark on active nav items / active section headers */
+  .ledger-rule {
+    position: relative;
+  }
+  .ledger-rule::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 4px;
+    bottom: 4px;
+    width: 2px;
+    background: theme("colors.amber.DEFAULT");
+    border-radius: 1px;
+  }
+
+  .card {
+    @apply bg-surface border border-steel-200 rounded-md shadow-card;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded bg-graphite-900 text-paper px-3.5 py-2 text-sm font-medium
+      hover:bg-graphite-700 transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 rounded bg-amber text-white px-3.5 py-2 text-sm font-medium
+      hover:bg-amber-600 transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded border border-steel-200 bg-surface px-3.5 py-2 text-sm font-medium
+      hover:bg-steel-100 transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .input {
+    @apply w-full rounded border border-steel-200 bg-surface px-3 py-2 text-sm text-graphite-900 placeholder:text-graphite-300
+      focus:border-amber transition-colors duration-150;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium;
+  }
+}
