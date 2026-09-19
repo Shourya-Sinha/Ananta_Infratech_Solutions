@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useWorkers } from "./api";
+import { AddWorkerPanel } from "./AddWorkerPanel";
 import { DataTable } from "@/components/ui/DataDisplay";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useAuthStore } from "@/stores/authStore";
 import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
 
 const VERIFICATION_FILTERS = [
@@ -16,10 +18,13 @@ const VERIFICATION_FILTERS = [
 export function WorkersListPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const user = useAuthStore((s) => s.user);
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
   // Reads ?status=ACTIVE etc from the URL so dashboard KPI cards can deep-link
   // straight into a pre-filtered view instead of a generic list.
   const [status, setStatus] = useState(searchParams.get("status") ?? "");
   const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
 
   const filters = {};
   if (status) filters.verificationStatus = status;
@@ -45,7 +50,16 @@ export function WorkersListPage() {
           <h1 className="font-display text-xl font-semibold text-graphite-900">Workers</h1>
           <p className="text-sm text-graphite-500">{data?.total ?? 0} total</p>
         </div>
+        {isSuperAdmin &&
+        <button className="btn-primary" onClick={() => setShowAdd((v) => !v)}>
+            {showAdd ? "Close" : "+ Add worker"}
+          </button>
+        }
       </div>
+
+      {showAdd && isSuperAdmin &&
+      <AddWorkerPanel />
+      }
 
       <div className="flex flex-wrap gap-3">
         <input
@@ -68,7 +82,7 @@ export function WorkersListPage() {
         rows={data?.items}
         isLoading={isLoading}
         emptyTitle="No workers found"
-        emptyBody="Workers appear here once registration begins from the mobile app."
+        emptyBody={isSuperAdmin ? "Register the first worker with “+ Add worker” above." : "Workers appear here once registration begins."}
         onRowClick={(w) => navigate(`/workers/${w._id}`)} />
       
     </div>);

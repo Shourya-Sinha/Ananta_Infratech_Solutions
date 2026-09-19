@@ -75,7 +75,13 @@ Foundation · Auth (OTP/login/refresh-rotation/logout/password-reset) ·
 RBAC & Permission Management · Audit Log · Socket.IO gateway · Users ·
 WorkTypes · Sites (role-scoped) · Workers (registration steps 2–5,
 verification chain, site assignment with history, work-type change,
-self-service document upload) · Documents (ImageKit) · Attendance
+self-service document upload, one-shot Super Admin web registration —
+POST /workers/register creates the login account + worker profile +
+optional initial site in a single call and returns the temporary
+password once, admin document review via GET /workers/:id/documents and
+per-document verify/reject via
+POST /workers/:id/documents/:docId/verify with ownership checks and
+worker notifications) · Documents (ImageKit) · Attendance
 (record/bulk/correct, duplicate prevention, payroll-lock enforcement) ·
 Salary engine (pure calculation + ledger posting + monthly rollup) ·
 Payroll (calculate/finalize/mark-paid/adjustment-on-finalized-month) ·
@@ -94,10 +100,13 @@ docs at `/api/v1/docs`
 ### Admin Web app — complete
 Login · Dashboard (live KPIs + chart, every stat box clickable and
 deep-linked to its full filtered detail view) · Workers list + detail
-(full verification chain, site assignment) · Sites list + create ·
+(one-step Super Admin "Add worker" registration with credential
+handover, full verification chain, admin-side document upload with
+per-document verify/reject, site assignment) · Sites list + create ·
 Attendance (site/date view) · Payroll (calculate/finalize/mark-paid) ·
 Finance (income/expense entry, site P/L, company-wide P/L view) ·
-Advances & Kharchi approval queue · Support chat · Permission Management
+Advances & Kharchi approval queue with Super Admin direct add · Support
+chat · Permission Management
 (per-role toggle matrix) · Audit Logs · Reports (CSV export) · Settings
 (payroll rules) · Work Types management
 

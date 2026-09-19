@@ -49,6 +49,56 @@ exports.WorkerService = {
     return profile;
   },
   /**
+   * Super Admin / Manager "Add worker" from the Admin Web UI: creates the
+   * User account (WORKER role — ACTIVE + phoneVerified, so the worker can
+   * log in immediately with the handed-over credentials) and the
+   * WorkerProfile in one step, optionally assigning the initial site.
+   * Registration Steps 1–3 collapse into a single admin action; the worker
+   * then continues through Steps 4–5 (documents -> verification) as usual.
+   */
+  async registerByAdmin(input, actorId) {
+    // Lazy require keeps module-init order independent of the users module.
+    const {
+      UserService
+    } = require("../users/user.service");
+    const {
+      user,
+      temporaryPassword
+    } = await UserService.create({
+      name: input.name,
+      phone: input.phone,
+      email: input.email,
+      roleKey: "WORKER",
+      password: input.password
+    }, actorId);
+    const profile = await this.selectWorkType({
+      userId: user._id.toString(),
+      workTypeId: input.workTypeId,
+      createdBy: actorId
+    });
+    if (input.siteId) {
+      await this.assignSite({
+        workerId: profile._id.toString(),
+        siteId: input.siteId,
+        assignedBy: actorId,
+        reason: "Initial assignment at registration"
+      });
+    }
+    try {
+      (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).emit(_sharedTypes.SOCKET_EVENTS.WORKER_CREATED, {
+        workerId: profile._id.toString(),
+        employeeId: profile.employeeId
+      });
+    } catch (err) {
+      // Socket gateway may not be initialized in test/script contexts —
+      // registration itself has already succeeded at this point.
+    }
+    return {
+      profile,
+      temporaryPassword
+    };
+  },
+  /**
    * Registration Step 5 (admin side): review uploaded documents and mark
    * DOCUMENT_VERIFIED once all required docs pass. Progression:
    * PENDING_VERIFICATION -> DOCUMENT_VERIFIED -> WORK_TYPE_VERIFIED -> ACTIVE

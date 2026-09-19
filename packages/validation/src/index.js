@@ -34,3 +34,14 @@ Object.keys(_requests).forEach(function (key) {
     }
   });
 });
+var _workers = require("./workers");
+Object.keys(_workers).forEach(function (key) {
+  if (key === "default" || key === "__esModule") return;
+  if (key in exports && exports[key] === _workers[key]) return;
+  Object.defineProperty(exports, key, {
+    enumerable: true,
+    get: function () {
+      return _workers[key];
+    }
+  });
+});

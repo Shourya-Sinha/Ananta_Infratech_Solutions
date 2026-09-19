@@ -13,6 +13,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
 import { DirectAdvancePanel, DirectKharchiPanel } from "@/features/requests/DirectAddPanels";
+import { WorkerDocumentsCard } from "./WorkerDocumentsCard";
 
 const STEPS = ["PENDING_VERIFICATION", "DOCUMENT_VERIFIED", "WORK_TYPE_VERIFIED", "ACTIVE"];
 
@@ -113,6 +114,8 @@ export function WorkerDetailPage() {
           </div>
         </div>
       }
+
+      <WorkerDocumentsCard workerId={worker._id} verificationStatus={worker.verificationStatus} />
 
       {isSuperAdmin &&
       <div className="card p-4">
