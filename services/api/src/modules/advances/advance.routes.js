@@ -62,6 +62,27 @@ advancesRouter.post("/", (0, _rbac.requirePermission)("advance.create"), (0, _er
   };
   res.status(201).json(body);
 }));
+// Super Admin direct add: creates an advance for ANY worker without a
+// request. Auto-approves, and by default marks it paid in the same step so
+// the salary deduction posts immediately (set markPaidNow:false to keep it
+// APPROVED for a later /:id/mark-paid).
+advancesRouter.post("/direct", (0, _rbac.requirePermission)("advance.directAdd"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const input = _validation.advanceDirectSchema.parse(req.body);
+  const request = await _advance.AdvanceService.createDirect({
+    workerId: input.worker,
+    amountRupees: input.amountRupees,
+    reason: input.reason,
+    requestedDate: input.requestedDate,
+    siteId: input.site,
+    markPaidNow: input.markPaidNow,
+    actorId: req.auth.userId
+  });
+  const body = {
+    success: true,
+    data: request
+  };
+  res.status(201).json(body);
+}));
 advancesRouter.post("/:id/approve", (0, _rbac.requirePermission)("advance.approve"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   const {
     approvedAmountRupees
@@ -85,7 +106,10 @@ advancesRouter.post("/:id/reject", (0, _rbac.requirePermission)("advance.reject"
   res.json(body);
 }));
 const markPaidSchema = _zod.z.object({
-  siteId: _zod.z.string().min(1)
+  // Optional: falls back to the worker's current site for the salary-ledger
+  // entry, so the web UI can complete the advance → deduction flow without a
+  // site picker when the worker is already assigned to a site.
+  siteId: _zod.z.string().min(1).optional()
 });
 advancesRouter.post("/:id/mark-paid", (0, _rbac.requirePermission)("advance.approve"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   const {

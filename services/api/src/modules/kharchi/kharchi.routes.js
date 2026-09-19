@@ -62,6 +62,26 @@ kharchiRouter.post("/", (0, _rbac.requirePermission)("kharchi.create"), (0, _err
   };
   res.status(201).json(body);
 }));
+// Super Admin direct add: creates a Kharchi for ANY worker without a
+// request and approves it in the same step, so the salary deduction posts
+// immediately through the standard approval pipeline.
+kharchiRouter.post("/direct", (0, _rbac.requirePermission)("kharchi.directAdd"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const input = _validation.kharchiDirectSchema.parse(req.body);
+  const request = await _kharchi.KharchiService.createDirect({
+    workerId: input.worker,
+    siteId: input.site,
+    amountRupees: input.amountRupees,
+    date: input.date,
+    category: input.category,
+    reason: input.reason,
+    actorId: req.auth.userId
+  });
+  const body = {
+    success: true,
+    data: request
+  };
+  res.status(201).json(body);
+}));
 kharchiRouter.post("/:id/approve", (0, _rbac.requirePermission)("kharchi.approve"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   const request = await _kharchi.KharchiService.approve(req.params.id, req.auth.userId);
   const body = {

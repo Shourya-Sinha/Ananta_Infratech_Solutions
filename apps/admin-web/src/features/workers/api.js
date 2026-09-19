@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/lib/apiClient";
 
-export function useWorkers(filters) {
+export function useWorkers(filters, options) {
   const qs = new URLSearchParams(filters).toString();
   return useQuery({
     queryKey: ["workers", filters],
-    queryFn: async () => unwrap(api.get(`/workers?${qs}`))
+    queryFn: async () => unwrap(api.get(`/workers?${qs}`)),
+    ...options
   });
 }
 

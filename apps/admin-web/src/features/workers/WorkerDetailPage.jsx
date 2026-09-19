@@ -9,8 +9,10 @@ import {
   useAssignSite,
   useSitesForSelect } from
 "./api";
+import { useAuthStore } from "@/stores/authStore";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
+import { DirectAdvancePanel, DirectKharchiPanel } from "@/features/requests/DirectAddPanels";
 
 const STEPS = ["PENDING_VERIFICATION", "DOCUMENT_VERIFIED", "WORK_TYPE_VERIFIED", "ACTIVE"];
 
@@ -18,8 +20,11 @@ export function WorkerDetailPage() {
   const { id } = useParams();
   const { data: worker, isLoading } = useWorker(id);
   const { data: sites } = useSitesForSelect();
+  const user = useAuthStore((s) => s.user);
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
   const [rejectReason, setRejectReason] = useState("");
   const [selectedSite, setSelectedSite] = useState("");
+  const [quickAdd, setQuickAdd] = useState(null); // null | "advance" | "kharchi"
 
   const verifyDocuments = useVerifyDocuments();
   const verifyWorkType = useVerifyWorkType();
@@ -106,6 +111,46 @@ export function WorkerDetailPage() {
               Reject
             </button>
           </div>
+        </div>
+      }
+
+      {isSuperAdmin &&
+      <div className="card p-4">
+          <p className="mb-3 font-display text-xs font-semibold uppercase tracking-wide text-graphite-500">
+            Add advance / Kharchi — Super Admin
+          </p>
+          <p className="mb-3 text-sm text-graphite-500">
+            Record an advance or Kharchi directly on this worker&apos;s account. Amounts are
+            approved instantly and flow into salary deductions and payroll totals.
+          </p>
+          <div className="flex gap-2">
+            <button
+          className={quickAdd === "advance" ? "btn-primary" : "btn-ghost"}
+          onClick={() => setQuickAdd(quickAdd === "advance" ? null : "advance")}>
+          
+              Add advance
+            </button>
+            <button
+          className={quickAdd === "kharchi" ? "btn-primary" : "btn-ghost"}
+          onClick={() => setQuickAdd(quickAdd === "kharchi" ? null : "kharchi")}>
+          
+              Add kharchi
+            </button>
+          </div>
+          {quickAdd === "advance" &&
+        <div className="mt-4">
+              <DirectAdvancePanel workers={[worker]} presetWorkerId={worker._id} />
+            </div>
+        }
+          {quickAdd === "kharchi" &&
+        <div className="mt-4">
+              <DirectKharchiPanel
+          workers={[worker]}
+          presetWorkerId={worker._id}
+          presetSiteId={worker.currentSite?._id} />
+          
+            </div>
+        }
         </div>
       }
 
