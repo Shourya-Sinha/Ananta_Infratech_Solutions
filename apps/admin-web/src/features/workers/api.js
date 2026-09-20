@@ -93,13 +93,31 @@ export function useCreateWorker() {
 /**
  * Super Admin "Add worker": one-shot registration (login account + worker
  * profile + optional initial site). The response carries the temporary
- * password exactly once for handover to the worker.
+ * password exactly once for handover to the worker. Pass
+ * `confirmDuplicate: true` to accept the duplicate warning — the existing
+ * (document-unverified) account is then updated in place.
  */
 export function useRegisterWorker() {
   const invalidate = useInvalidateWorkers();
   return useMutation({
     mutationFn: async (input) => unwrap(api.post("/workers/register", input)),
     onSuccess: invalidate
+  });
+}
+
+/**
+ * Pre-flight duplicate check: is this phone/email already registered? Used
+ * by the Add-worker panel to show the "already registered" warning (with
+ * the existing worker's details) BEFORE submitting the registration.
+ */
+export function useCheckWorkerDuplicate() {
+  return useMutation({
+    mutationFn: async ({ phone, email }) => {
+      const params = new URLSearchParams();
+      if (phone) params.set("phone", phone);
+      if (email) params.set("email", email);
+      return unwrap(api.get(`/workers/check-duplicate?${params.toString()}`));
+    }
   });
 }
 

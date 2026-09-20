@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/lib/apiClient";
+import { useToast } from "@/components/ui/Toast";
 
 export function useAdvances(status, options) {
   const qs = new URLSearchParams(status ? { status } : {}).toString();
@@ -21,6 +22,7 @@ export function useKharchi(status, options) {
 
 export function useMarkAdvancePaid() {
   const qc = useQueryClient();
+  const toast = useToast();
   return useMutation({
     mutationFn: async ({ id, siteId }) =>
     unwrap(api.post(`/advances/${id}/mark-paid`, siteId ? { siteId } : {})),
@@ -28,7 +30,9 @@ export function useMarkAdvancePaid() {
       qc.invalidateQueries({ queryKey: ["advances"] });
       qc.invalidateQueries({ queryKey: ["salary"] });
       qc.invalidateQueries({ queryKey: ["payroll"] });
-    }
+      toast.success("Advance marked as PAID. The salary deduction was posted.");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not mark the advance paid.")
   });
 }
 
@@ -50,9 +54,14 @@ function useInvalidateRequests() {
  */
 export function useDirectAddAdvance() {
   const invalidate = useInvalidateRequests();
+  const toast = useToast();
   return useMutation({
     mutationFn: async (input) => unwrap(api.post("/advances/direct", input)),
-    onSuccess: invalidate
+    onSuccess: (_data, input) => {
+      invalidate();
+      toast.success(`Advance of ₹${input.amountRupees} added directly and the salary deduction posted.`);
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not add the advance.")
   });
 }
 
@@ -62,8 +71,13 @@ export function useDirectAddAdvance() {
  */
 export function useDirectAddKharchi() {
   const invalidate = useInvalidateRequests();
+  const toast = useToast();
   return useMutation({
     mutationFn: async (input) => unwrap(api.post("/kharchi/direct", input)),
-    onSuccess: invalidate
+    onSuccess: (_data, input) => {
+      invalidate();
+      toast.success(`Kharchi of ₹${input.amountRupees} added directly and the salary deduction posted.`);
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not add the kharchi.")
   });
 }

@@ -67,7 +67,11 @@ const PERMISSIONS = exports.PERMISSIONS = [
 }, {
   key: "attendance.update",
   group: "Attendance",
-  description: "Edit/correct attendance"
+  description: "Correct/edit an attendance record"
+}, {
+  key: "attendance.delete",
+  group: "Attendance",
+  description: "Delete an attendance record (reverses its salary posting)"
 }, {
   key: "attendance.read",
   group: "Attendance",
@@ -180,6 +184,10 @@ const PERMISSIONS = exports.PERMISSIONS = [
   key: "site.capital.manage",
   group: "Finance",
   description: "Record/manage site capital injections"
+}, {
+  key: "site.investment.manage",
+  group: "Finance",
+  description: "Record/manage admin investments into a site/project"
 }, {
   key: "financialReports.read",
   group: "Finance",

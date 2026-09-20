@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, unwrap } from "@/lib/apiClient";
 import { DataTable } from "@/components/ui/DataDisplay";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useToast } from "@/components/ui/Toast";
 import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
 
 function useSites(status) {
@@ -16,10 +17,15 @@ function useSites(status) {
 
 function useCreateSite() {
   const qc = useQueryClient();
+  const toast = useToast();
   return useMutation({
     mutationFn: async (input) =>
     unwrap(api.post("/sites", input)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["sites"] })
+    onSuccess: (_data, input) => {
+      qc.invalidateQueries({ queryKey: ["sites"] });
+      toast.success(`Site “${input.name}” created.`);
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not create the site.")
   });
 }
 
