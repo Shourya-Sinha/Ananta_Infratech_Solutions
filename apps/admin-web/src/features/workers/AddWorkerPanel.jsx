@@ -110,23 +110,80 @@ export function AddWorkerPanel() {
           <label className="mb-1 block text-xs text-graphite-500">Email (optional)</label>
           <input className="input" type="email" value={form.email} onChange={set("email")} placeholder="worker@example.com" />
         </div>
-        <div>
+        {/* <div>
           <label className="mb-1 block text-xs text-graphite-500">Work type *</label>
           <select className="input" value={form.workTypeId} onChange={set("workTypeId")}>
             <option value="">Select a work type…</option>
-            {workTypes?.map((wt) =>
-            <option key={wt._id} value={wt._id} disabled={!wt.isActive}>
-                {wt.name} — {formatINR((wt.defaultDailyRatePaise ?? 0) / 100)}/day
+            {workTypes?.map((wt) => (
+              <option
+                key={wt.id}
+                value={wt.id}
+                disabled={!wt.isActive}
+              >
+                {wt.name} — {formatINR(wt.defaultDailyRate ?? 0)}/day
               </option>
-            )}
+            ))}
           </select>
-        </div>
+        </div> */}
+        <div>
+  <label className="mb-1 block text-xs text-graphite-500">
+    Work type *
+  </label>
+
+  <select
+    className="input"
+    value={form.workTypeId}
+    onChange={set("workTypeId")}
+  >
+    <option value="">Select a work type…</option>
+
+    {workTypes?.map((wt) => (
+      <option
+        key={wt.id}
+        value={wt.id}
+        disabled={!wt.isActive}
+      >
+        {wt.name} — {formatINR(wt.defaultDailyRate ?? 0)}/day
+      </option>
+    ))}
+  </select>
+</div>
+        {/* <div>
+          <label className="mb-1 block text-xs text-graphite-500">
+            Work type *
+          </label>
+
+          <select
+            className="input"
+            value={form.workTypeId}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                workTypeId: e.target.value
+              }))
+            }
+          >
+            <option value="">Select a work type…</option>
+
+            {Array.isArray(workTypes) &&
+              workTypes.map((wt) => (
+                <option
+                  key={wt._id}
+                  value={wt._id}
+                  disabled={!wt.isActive}
+                >
+                  {wt.name} —{" "}
+                  {formatINR((wt.defaultDailyRatePaise ?? 0) / 100)}/day
+                </option>
+              ))}
+          </select>
+        </div> */}
         <div>
           <label className="mb-1 block text-xs text-graphite-500">Site (optional)</label>
           <select className="input" value={form.siteId} onChange={set("siteId")}>
             <option value="">Assign later</option>
             {sites?.map((s) =>
-            <option key={s._id} value={s._id}>
+              <option key={s._id} value={s._id}>
                 {s.name} ({s.code})
               </option>
             )}
@@ -139,7 +196,7 @@ export function AddWorkerPanel() {
         </div>
       </div>
       {error &&
-      <p className="mt-2 text-sm text-rust">
+        <p className="mt-2 text-sm text-rust">
           {error}
         </p>
       }

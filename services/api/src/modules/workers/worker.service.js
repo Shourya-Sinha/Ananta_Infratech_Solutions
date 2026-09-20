@@ -36,16 +36,30 @@ exports.WorkerService = {
       verificationStatus: "PENDING_VERIFICATION",
       createdBy: params.createdBy
     });
-    await _audit.AuditService.log({
-      actor: params.createdBy,
-      action: "WORKER_PROFILE_CREATED",
-      targetType: "WorkerProfile",
-      targetId: profile._id.toString(),
-      after: {
-        workType: workType.name,
-        employeeId
-      }
-    });
+    // await _audit.AuditService.log({
+    //   actor: params.createdBy,
+    //   action: "WORKER_PROFILE_CREATED",
+    //   targetType: "WorkerProfile",
+    //   targetId: profile._id.toString(),
+    //   after: {
+    //     workType: workType.name,
+    //     employeeId
+    //   }
+    // });
+    try {
+      await AuditService.log({
+        actor: params.createdBy,
+        action: "WORKER_PROFILE_CREATED",
+        targetType: "WorkerProfile",
+        targetId: profile._id.toString(),
+        after: {
+          workType: workType.name,
+          employeeId
+        }
+      });
+    } catch (err) {
+      console.error("Worker audit logging failed:", err);
+    }
     return profile;
   },
   /**
