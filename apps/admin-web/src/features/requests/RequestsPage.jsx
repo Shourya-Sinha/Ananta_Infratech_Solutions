@@ -6,6 +6,7 @@ import { useWorkers } from "@/features/workers/api";
 import { useAdvances, useKharchi, useMarkAdvancePaid } from "./api";
 import { DataTable } from "@/components/ui/DataDisplay";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useToast } from "@/components/ui/Toast";
 import { formatINR, formatDate } from "@/lib/format";
 import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
 import { DirectAdvancePanel, DirectKharchiPanel } from "./DirectAddPanels";
@@ -20,6 +21,7 @@ export function RequestsPage() {
   const user = useAuthStore((s) => s.user);
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
   const qc = useQueryClient();
+  const toast = useToast();
 
   const status = scope === "ALL" ? undefined : scope;
   const { data: advances, isLoading: loadingAdv } = useAdvances(status, { enabled: tab === "advances" });
@@ -37,23 +39,39 @@ export function RequestsPage() {
   const approveAdvance = useMutation({
     mutationFn: async ({ id, amountRupees }) =>
     unwrap(api.post(`/advances/${id}/approve`, { approvedAmountRupees: amountRupees })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["advances"] })
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["advances"] });
+      toast.success(`Advance approved for ${formatINR(Number(variables.amountRupees ?? 0))}.`);
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not approve the advance.")
   });
   const rejectAdvance = useMutation({
     mutationFn: async ({ id, reason }) =>
     unwrap(api.post(`/advances/${id}/reject`, { rejectionReason: reason })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["advances"] })
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["advances"] });
+      toast.success("Advance request rejected. The worker has been notified.");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not reject the advance.")
   });
   const markAdvancePaid = useMarkAdvancePaid();
 
   const approveKharchi = useMutation({
     mutationFn: async (id) => unwrap(api.post(`/kharchi/${id}/approve`)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["kharchi"] })
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["kharchi"] });
+      toast.success("Kharchi approved. The salary deduction was posted immediately.");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not approve the kharchi.")
   });
   const rejectKharchi = useMutation({
     mutationFn: async ({ id, reason }) =>
     unwrap(api.post(`/kharchi/${id}/reject`, { rejectionReason: reason })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["kharchi"] })
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["kharchi"] });
+      toast.success("Kharchi request rejected. The worker has been notified.");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not reject the kharchi.")
   });
 
   const advanceColumns = [

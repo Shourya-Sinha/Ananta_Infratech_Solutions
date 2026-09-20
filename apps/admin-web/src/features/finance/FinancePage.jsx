@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, unwrap } from "@/lib/apiClient";
 import { DataTable, KpiCard } from "@/components/ui/DataDisplay";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useToast } from "@/components/ui/Toast";
 import { formatINR, formatDate, cx } from "@/lib/format";
 import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
 
@@ -37,6 +38,9 @@ export function FinancePage() {
   const [tab, setTab] = useState(initialTab);
   const [site, setSite] = useState("");
   const qc = useQueryClient();
+  const toast = useToast();
+
+  const siteName = (siteId) => sites?.find((s) => s._id === siteId)?.name ?? "site";
 
   // GROSS SUMMARY — company-wide totals + per-site rows (investment, income,
   // expenses, profit/loss per site). Always loaded so the gross figure and
@@ -85,21 +89,16 @@ export function FinancePage() {
   const [showForm, setShowForm] = useState(false);
 
   const record = useMutation({
-    mutationFn: async () =>
-    unwrap(
-      api.post(`/finance/${tab}`, {
-        siteId: site,
-        category: form.category,
-        amountRupees: Number(form.amountRupees),
-        date: form.date,
-        description: form.description || undefined
-      })
-    ),
-    onSuccess: () => {
+    mutationFn: async (payload) => unwrap(api.post(`/finance/${payload.tab}`, payload.body)),
+    onSuccess: (_data, payload) => {
       qc.invalidateQueries({ queryKey: ["finance"] });
       setShowForm(false);
       setForm({ category: "", amountRupees: "", date: today(), description: "" });
-    }
+      toast.success(
+        `${payload.tab === "income" ? "Income" : "Expense"} of ${formatINR(Number(payload.body.amountRupees))} recorded for ${siteName(site)}.`
+      );
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not save the entry.")
   });
 
   // --- Add investment (per site) -----------------------------------------
@@ -107,27 +106,25 @@ export function FinancePage() {
   const [showInvForm, setShowInvForm] = useState(false);
 
   const addInvestment = useMutation({
-    mutationFn: async () =>
-    unwrap(
-      api.post("/finance/investments", {
-        siteId: site,
-        amountRupees: Number(invForm.amountRupees),
-        type: invForm.type,
-        date: invForm.date,
-        reference: invForm.reference || undefined,
-        note: invForm.note || undefined
-      })
-    ),
-    onSuccess: () => {
+    mutationFn: async (body) => unwrap(api.post("/finance/investments", body)),
+    onSuccess: (_data, body) => {
       qc.invalidateQueries({ queryKey: ["finance"] });
       setShowInvForm(false);
       setInvForm({ type: "CASH", amountRupees: "", date: today(), reference: "", note: "" });
-    }
+      toast.success(
+        `Investment of ${formatINR(Number(body.amountRupees))} added to ${siteName(site)} — totals and profit/loss updated.`
+      );
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not save the investment.")
   });
 
   const reverseInvestment = useMutation({
     mutationFn: async (investmentId) => unwrap(api.post(`/finance/investments/${investmentId}/reverse`)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] })
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["finance"] });
+      toast.success("Investment reversed. A reversal entry was recorded and totals updated.");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not reverse the investment.")
   });
 
   const transactionColumns = [
@@ -414,7 +411,16 @@ export function FinancePage() {
           className="card grid grid-cols-4 gap-3 p-4"
           onSubmit={(e) => {
             e.preventDefault();
-            record.mutate();
+            record.mutate({
+              tab,
+              body: {
+                siteId: site,
+                category: form.category,
+                amountRupees: Number(form.amountRupees),
+                date: form.date,
+                description: form.description || undefined
+              }
+            });
           }}>
           
               <select className="input" required value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>

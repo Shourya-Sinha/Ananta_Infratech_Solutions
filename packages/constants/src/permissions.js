@@ -67,7 +67,11 @@ const PERMISSIONS = exports.PERMISSIONS = [
 }, {
   key: "attendance.update",
   group: "Attendance",
-  description: "Edit/correct attendance"
+  description: "Correct/edit an attendance record"
+}, {
+  key: "attendance.delete",
+  group: "Attendance",
+  description: "Delete an attendance record (reverses its salary posting)"
 }, {
   key: "attendance.read",
   group: "Attendance",

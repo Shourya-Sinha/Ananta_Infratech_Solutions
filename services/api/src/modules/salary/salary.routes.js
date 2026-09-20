@@ -83,7 +83,13 @@ salaryRouter.get("/worker/:id/summary", (0, _errorHandler.asyncHandler)(async (r
     advanceDeductions: (0, _utils.paiseToRupees)(payroll.advanceDeductionsPaise),
     kharchiDeductions: (0, _utils.paiseToRupees)(payroll.kharchiDeductionsPaise),
     otherDeductions: (0, _utils.paiseToRupees)(payroll.otherDeductionsPaise),
-    netSalary: (0, _utils.paiseToRupees)(payroll.netSalaryPaise)
+    netSalary: (0, _utils.paiseToRupees)(payroll.netSalaryPaise),
+    presentDays: payroll.presentDays ?? 0,
+    halfDays: payroll.halfDays ?? 0,
+    paidLeaveDays: payroll.paidLeaveDays ?? 0,
+    unpaidLeaveDays: payroll.unpaidLeaveDays ?? 0,
+    absentDays: payroll.absentDays ?? 0,
+    overtimeHours: payroll.overtimeHours ?? 0
   };
   const body = {
     success: true,

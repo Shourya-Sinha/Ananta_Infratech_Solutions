@@ -18,6 +18,7 @@ const SOCKET_EVENTS = exports.SOCKET_EVENTS = {
   WORKER_VERIFICATION_UPDATED: "worker:verification_updated",
   ATTENDANCE_CREATED: "attendance:created",
   ATTENDANCE_UPDATED: "attendance:updated",
+  ATTENDANCE_DELETED: "attendance:deleted",
   ATTENDANCE_APPROVED: "attendance:approved",
   SALARY_RECALCULATED: "salary:recalculated",
   SALARY_LEDGER_UPDATED: "salary:ledger_updated",

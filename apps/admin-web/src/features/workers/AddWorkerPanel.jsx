@@ -4,6 +4,7 @@ import { TriangleAlert } from "lucide-react";
 import { useRegisterWorker, useCheckWorkerDuplicate, useSitesForSelect, useWorkTypes } from "./api";
 import { formatINR } from "@/lib/format";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useToast } from "@/components/ui/Toast";
 
 const EMPTY_FORM = { name: "", phone: "", email: "", workTypeId: "", siteId: "", password: "" };
 
@@ -34,6 +35,7 @@ export function AddWorkerPanel() {
   const { data: sites } = useSitesForSelect();
   const register = useRegisterWorker();
   const checkDuplicate = useCheckWorkerDuplicate();
+  const toast = useToast();
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -52,6 +54,11 @@ export function AddWorkerPanel() {
     setCreated({ ...result, name: form.name.trim(), phone: form.phone.trim() });
     setForm(EMPTY_FORM);
     setDuplicate(null);
+    if (result.updatedExisting) {
+      toast.success(`Existing account found and updated for ${result.profile.employeeId}. New credentials issued.`);
+    } else {
+      toast.success(`Worker registered — Employee ID ${result.profile.employeeId}. Credentials ready for handover.`);
+    }
   };
 
   const submit = async () => {
@@ -71,6 +78,7 @@ export function AddWorkerPanel() {
         if (!check.canOverwrite) {
           // Document-verified worker (or a non-worker account): hard error.
           setError(check.message);
+          toast.error(check.message, "Already registered");
           return;
         }
         // Unverified worker: show the warning and wait for confirmation.
