@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
+  UserCog,
   Building2,
   ClipboardCheck,
   Wallet,
@@ -55,6 +56,7 @@ const NAV_GROUPS =
   items: [
   { to: "/reports", label: "Reports", icon: BarChart3 },
   { to: "/permissions", label: "Permissions", icon: ShieldCheck },
+  { to: "/users", label: "Users", icon: UserCog },
   { to: "/audit-logs", label: "Audit Logs", icon: ScrollText },
   { to: "/settings", label: "Settings", icon: Settings }]
 

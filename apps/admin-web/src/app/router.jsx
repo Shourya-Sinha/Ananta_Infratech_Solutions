@@ -16,6 +16,7 @@ import { AuditLogsPage } from "@/features/audit/AuditLogsPage";
 import { ReportsPage } from "@/features/reports/ReportsPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { WorkTypesPage } from "@/features/workTypes/WorkTypesPage";
+import { UsersPage } from "@/features/users/UsersPage";
 
 export function AppRouter() {
   return (
@@ -34,6 +35,7 @@ export function AppRouter() {
           <Route path="/requests" element={<RequestsPage />} />
           <Route path="/support" element={<SupportPage />} />
           <Route path="/permissions" element={<PermissionsPage />} />
+          <Route path="/users" element={<UsersPage />} />
           <Route path="/audit-logs" element={<AuditLogsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
