@@ -13,6 +13,9 @@ var _employeeId = require("./employeeId.util");
 var _gateway = require("../../sockets/gateway");
 var _sharedTypes = require("@ananta/shared-types");
 var _notification = require("../notifications/notification.service");
+var _argon2 = require("argon2");
+var _nodeCrypto = require("node:crypto");
+var _duplicatePolicy = require("./duplicatePolicy");
 exports.WorkerService = {
   /**
    * Registration Step 2: select work type. Creates the WorkerProfile shell.
@@ -49,15 +52,267 @@ exports.WorkerService = {
     return profile;
   },
   /**
+   * Duplicate lookup used by BOTH the pre-flight check endpoint and
+   * registerByAdmin. Matches an existing account by phone first, then by
+   * email, and gathers everything needed to decide what to do: the worker
+   * profile (if any) and how many of the account's documents are VERIFIED.
+   */
+  async findExistingWorkerAccount(input) {
+    let user = await _User.User.findOne({
+      phone: input.phone
+    }).populate("role", "key label");
+    let matchedPhone = Boolean(user);
+    let matchedEmail = false;
+    if (!user && input.email) {
+      user = await _User.User.findOne({
+        email: input.email.toLowerCase()
+      }).populate("role", "key label");
+      matchedEmail = Boolean(user);
+    }
+    if (!user) return null;
+    const profile = await _WorkerProfile.WorkerProfile.findOne({
+      user: user._id
+    });
+    const verifiedDocumentCount = await _Document.DocumentModel.countDocuments({
+      owner: user._id,
+      verificationStatus: "VERIFIED"
+    });
+    return {
+      user,
+      profile: profile ?? null,
+      matchedPhone,
+      matchedEmail,
+      verifiedDocumentCount
+    };
+  },
+  summarizeExistingAccount(existing) {
+    return {
+      userId: existing.user._id.toString(),
+      workerId: existing.profile?._id?.toString() ?? null,
+      employeeId: existing.profile?.employeeId ?? null,
+      name: existing.user.name,
+      phone: existing.user.phone,
+      email: existing.user.email ?? null,
+      role: existing.user.role?.key ?? null,
+      userStatus: existing.user.status,
+      verificationStatus: existing.profile?.verificationStatus ?? null,
+      verifiedDocumentCount: existing.verifiedDocumentCount,
+      documentsVerified: existing.verifiedDocumentCount > 0
+    };
+  },
+  /**
+   * Pre-flight duplicate check for the Admin "Add worker" panel: answers
+   * "is this phone/email already registered, by whom, and can it still be
+   * overwritten?" WITHOUT writing anything. `canOverwrite` is true only for
+   * document-UNverified worker accounts — verified workers block reuse.
+   */
+  async checkDuplicate(input) {
+    const existing = await this.findExistingWorkerAccount(input);
+    if (!existing) {
+      return {
+        duplicate: false,
+        matches: {
+          phone: false,
+          email: false
+        },
+        existing: null,
+        verified: false,
+        canOverwrite: false,
+        message: ""
+      };
+    }
+    const matches = {
+      phone: existing.matchedPhone,
+      email: existing.matchedEmail
+    };
+    const existingSummary = this.summarizeExistingAccount(existing);
+    const matchedFields = [existing.matchedPhone && "phone number", existing.matchedEmail && "email"].filter(Boolean).join(" and ");
+    const isWorkerAccount = existingSummary.role === "WORKER" || Boolean(existingSummary.workerId);
+    if (!isWorkerAccount) {
+      return {
+        duplicate: true,
+        matches,
+        existing: existingSummary,
+        verified: false,
+        canOverwrite: false,
+        message: `This ${matchedFields} already belongs to a ${existingSummary.role ?? "non-worker"} account and cannot be reused for worker registration.`
+      };
+    }
+    const verified = (0, _duplicatePolicy.isWorkerDocumentVerified)(existingSummary);
+    return {
+      duplicate: true,
+      matches,
+      existing: existingSummary,
+      verified,
+      canOverwrite: !verified,
+      message: verified ? `This ${matchedFields} already exists — it is registered to ${existingSummary.name} (Employee ID ${existingSummary.employeeId ?? "pending"}), whose documents are already verified. Please use a different ${matchedFields}.` : `Warning: this ${matchedFields} is already registered to ${existingSummary.name} (Employee ID ${existingSummary.employeeId ?? "pending"}). Their documents are NOT verified yet — you may still register, and the existing account will be updated with the new data.`
+    };
+  },
+  /**
+   * Admin confirmed the duplicate warning: UPDATE the existing account in
+   * place with the newly entered data instead of creating a second account.
+   * Only reachable for document-UNverified workers (the policy blocks
+   * verified ones before this is ever called). The employee ID, ledger and
+   * site-assignment history are preserved; the login data (name, phone,
+   * email, password, work type, site) is replaced.
+   */
+  async updateExistingWorkerAccount(existing, input, actorId) {
+    const user = existing.user;
+
+    // Unique guards: never steal a unique field from a DIFFERENT account.
+    if (input.email) {
+      const emailOwner = await _User.User.findOne({
+        email: input.email.toLowerCase()
+      });
+      if (emailOwner && emailOwner._id.toString() !== user._id.toString()) {
+        throw new _AppError.AppError(_AppError.ERROR_CODES.CONFLICT, `Cannot update: the email ${input.email} already exists for a different account.`, 409, {
+          kind: "EMAIL_TAKEN"
+        });
+      }
+    }
+    if (!existing.matchedPhone && input.phone) {
+      const phoneOwner = await _User.User.findOne({
+        phone: input.phone
+      });
+      if (phoneOwner && phoneOwner._id.toString() !== user._id.toString()) {
+        throw new _AppError.AppError(_AppError.ERROR_CODES.CONFLICT, `Cannot update: the phone number ${input.phone} already exists for a different account.`, 409, {
+          kind: "PHONE_TAKEN"
+        });
+      }
+    }
+    const before = {
+      name: user.name,
+      phone: user.phone,
+      email: user.email ?? null,
+      status: user.status,
+      workType: existing.profile?.workType?.toString() ?? null
+    };
+
+    // 1. Update the login account in place (fresh credentials for handover).
+    user.name = input.name;
+    user.phone = input.phone;
+    if (input.email) user.email = input.email.toLowerCase();
+    user.status = "ACTIVE";
+    user.phoneVerified = true;
+    const temporaryPassword = input.password ?? _nodeCrypto.randomBytes(9).toString("base64url");
+    user.passwordHash = await _argon2.hash(temporaryPassword);
+    await user.save();
+
+    // 2. Update (or create) the worker profile — employee id stays the same.
+    let profile = existing.profile;
+    if (profile) {
+      const workType = await _WorkType.WorkType.findById(input.workTypeId);
+      if (!workType || !workType.isActive) throw _AppError.AppError.validation("Invalid or inactive work type.");
+      profile.workType = workType._id;
+      await profile.save();
+    } else {
+      profile = await this.selectWorkType({
+        userId: user._id.toString(),
+        workTypeId: input.workTypeId,
+        createdBy: actorId
+      });
+    }
+
+    // 3. Optional site (re)assignment.
+    if (input.siteId) {
+      await this.assignSite({
+        workerId: profile._id.toString(),
+        siteId: input.siteId,
+        assignedBy: actorId,
+        reason: "Re-registration of existing (unverified) account"
+      });
+    }
+    await _audit.AuditService.log({
+      actor: actorId,
+      action: "WORKER_DUPLICATE_ACCOUNT_UPDATED",
+      targetType: "WorkerProfile",
+      targetId: profile._id.toString(),
+      before,
+      after: {
+        name: user.name,
+        phone: user.phone,
+        email: user.email ?? null,
+        workType: profile.workType?.toString() ?? null
+      }
+    });
+    try {
+      (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).emit(_sharedTypes.SOCKET_EVENTS.WORKER_UPDATED, {
+        workerId: profile._id.toString(),
+        employeeId: profile.employeeId,
+        updatedExisting: true
+      });
+    } catch (err) {
+      // Socket gateway may not be initialized in test/script contexts.
+    }
+    return {
+      profile,
+      temporaryPassword,
+      updatedExisting: true
+    };
+  },
+  /**
    * Super Admin / Manager "Add worker" from the Admin Web UI: creates the
    * User account (WORKER role — ACTIVE + phoneVerified, so the worker can
    * log in immediately with the handed-over credentials) and the
    * WorkerProfile in one step, optionally assigning the initial site.
    * Registration Steps 1–3 collapse into a single admin action; the worker
    * then continues through Steps 4–5 (documents -> verification) as usual.
+   *
+   * DUPLICATE HANDLING: if the phone/email already belongs to an existing
+   * account —
+   *   • document-VERIFIED worker  -> hard 409 error ("already exists"), never overwritten;
+   *   • unverified worker, admin hasn't confirmed -> 409 with full duplicate
+   *     details (kind: DUPLICATE_WORKER) so the Admin UI shows the warning;
+   *   • unverified worker + confirmDuplicate=true -> the EXISTING account is
+   *     updated in place with the new data (same employee ID, history kept).
    */
   async registerByAdmin(input, actorId) {
-    // Lazy require keeps module-init order independent of the users module.
+    const existing = await this.findExistingWorkerAccount(input);
+    if (existing) {
+      const existingSummary = this.summarizeExistingAccount(existing);
+      const isWorkerAccount = existingSummary.role === "WORKER" || Boolean(existingSummary.workerId);
+      if (!isWorkerAccount) {
+        throw new _AppError.AppError(_AppError.ERROR_CODES.CONFLICT, `This ${existing.matchedPhone ? "phone number" : "email"} already belongs to a ${existingSummary.role ?? "non-worker"} account and cannot be used for worker registration.`, 409, {
+          kind: "DUPLICATE_NON_WORKER",
+          matches: {
+            phone: existing.matchedPhone,
+            email: existing.matchedEmail
+          },
+          existing: existingSummary
+        });
+      }
+      const decision = (0, _duplicatePolicy.decideDuplicateRegistration)({
+        matches: {
+          phone: existing.matchedPhone,
+          email: existing.matchedEmail
+        },
+        confirmDuplicate: input.confirmDuplicate === true,
+        existing: existingSummary
+      });
+      if (decision.action === _duplicatePolicy.DUPLICATE_ACTIONS.BLOCK_VERIFIED) {
+        throw new _AppError.AppError(_AppError.ERROR_CODES.CONFLICT, decision.message, 409, {
+          kind: "DUPLICATE_WORKER_VERIFIED",
+          matches: {
+            phone: existing.matchedPhone,
+            email: existing.matchedEmail
+          },
+          existing: existingSummary
+        });
+      }
+      if (decision.action === _duplicatePolicy.DUPLICATE_ACTIONS.WARN_CONFIRM_REQUIRED) {
+        throw new _AppError.AppError(_AppError.ERROR_CODES.CONFLICT, decision.message, 409, {
+          kind: "DUPLICATE_WORKER",
+          matches: {
+            phone: existing.matchedPhone,
+            email: existing.matchedEmail
+          },
+          existing: existingSummary
+        });
+      }
+      if (decision.action === _duplicatePolicy.DUPLICATE_ACTIONS.UPDATE_EXISTING) {
+        return this.updateExistingWorkerAccount(existing, input, actorId);
+      }
+    }
     const {
       UserService
     } = require("../users/user.service");
@@ -95,7 +350,8 @@ exports.WorkerService = {
     }
     return {
       profile,
-      temporaryPassword
+      temporaryPassword,
+      updatedExisting: false
     };
   },
   /**

@@ -32,6 +32,8 @@ const SOCKET_EVENTS = exports.SOCKET_EVENTS = {
   SITE_CREATED: "site:created",
   SITE_UPDATED: "site:updated",
   SITE_CAPITAL_UPDATED: "site:capital_updated",
+  SITE_INVESTMENT_ADDED: "site:investment_added",
+  SITE_INVESTMENT_REVERSED: "site:investment_reversed",
   SITE_INCOME_ADDED: "site:income_added",
   SITE_EXPENSE_ADDED: "site:expense_added",
   SITE_PROFIT_UPDATED: "site:profit_updated",

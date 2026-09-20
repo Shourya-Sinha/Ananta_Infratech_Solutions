@@ -181,6 +181,10 @@ const PERMISSIONS = exports.PERMISSIONS = [
   group: "Finance",
   description: "Record/manage site capital injections"
 }, {
+  key: "site.investment.manage",
+  group: "Finance",
+  description: "Record/manage admin investments into a site/project"
+}, {
   key: "financialReports.read",
   group: "Finance",
   description: "View company-wide financial reports"

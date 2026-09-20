@@ -91,6 +91,20 @@ with immediate ledger deduction) · Super Admin direct add
 worker under `advance.directAdd`/`kharchi.directAdd`, auto-approved with the
 salary deduction posted through the standard pipeline) · Site Finance
 (capital/income/expense/reversal/site & company profit-loss) ·
+**Site Investments** (POST /finance/investments — the admin records money,
+material or equipment put INTO any project/site; GET /finance/investments
+lists them per site; POST /finance/investments/:id/reverse reverses an
+entry; GET /finance/summary returns every site's total investment, total
+expenses, profit/loss and net position plus the company-wide gross
+profit/loss totals; new `site.investment.manage` permission) ·
+**Duplicate-worker guard** (GET /workers/check-duplicate pre-flight check;
+POST /workers/register refuses with a 409 carrying the existing account's
+details when the phone/email already belongs to a document-UNverified
+worker — the Admin UI shows exactly which number/email is already
+registered and asks whether to proceed; on confirmation the EXISTING
+account is updated in place with the new data, same employee ID and
+history preserved; document-VERIFIED workers always hard-fail with
+"number/email already exists" and can never be overwritten) ·
 Notifications (in-app + real Expo push dispatch) · SMS gateway
 (MSG91-backed, dev-mode fallback) · Settings (salary rules, work types) ·
 Support/Chat (tickets + messages) · Audit log read API · Reports
@@ -104,7 +118,13 @@ deep-linked to its full filtered detail view) · Workers list + detail
 handover, full verification chain, admin-side document upload with
 per-document verify/reject, site assignment) · Sites list + create ·
 Attendance (site/date view) · Payroll (calculate/finalize/mark-paid) ·
-Finance (income/expense entry, site P/L, company-wide P/L view) ·
+Finance (per-site Investments tab with one-click "Add investment" +
+reversal, income/expense entry, per-site section showing total
+investment / total expenses / profit-loss / net position, an all-sites
+table with a gross totals footer, and company-wide gross profit/loss
+KPI cards) · Add-worker duplicate warning (pre-flight phone/email check —
+unverified duplicate shows "already registered to <worker>, update
+anyway?" confirmation; verified duplicate shows a hard error) ·
 Advances & Kharchi approval queue with Super Admin direct add · Support
 chat · Permission Management
 (per-role toggle matrix) · Audit Logs · Reports (CSV export) · Settings
