@@ -74,6 +74,15 @@ export function RequestsPage() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Could not reject the kharchi.")
   });
 
+  const cancelAdvance = useMutation({
+    mutationFn: async (id) => unwrap(api.post(`/advances/${id}/cancel`)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["advances"] });
+      toast.success("Advance request cancelled.");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not cancel the advance."),
+  });
+
   const advanceColumns = [
   { header: "Employee ID", cell: (r) => r.worker?.employeeId },
   { header: "Amount", cell: (r) => formatINR(toRupees(r.amountPaise)) },
@@ -123,6 +132,16 @@ export function RequestsPage() {
         }}>
         
             Reject
+          </button>
+      }
+          {r.status === "REQUESTED" &&
+      <button
+        className="btn-ghost !px-2 !py-1 text-xs"
+        onClick={() => {
+          if (window.confirm("Cancel this advance request?")) cancelAdvance.mutate(r._id);
+        }}>
+        
+            Cancel
           </button>
       }
         </div>

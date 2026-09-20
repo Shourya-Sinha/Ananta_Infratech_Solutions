@@ -160,3 +160,19 @@ export function useVerifyWorkerDocument(workerId) {
     onSuccess: invalidate
   });
 }
+
+export function useChangeWorkType() {
+  const invalidate = useInvalidateWorkers();
+  return useMutation({
+    mutationFn: async ({ workerId, workTypeId }) => unwrap(api.post(`/workers/${workerId}/change-work-type`, { workTypeId })),
+    onSuccess: invalidate,
+  });
+}
+
+export function useAssignmentHistory(workerId) {
+  return useQuery({
+    queryKey: ["workers", workerId, "assignments"],
+    queryFn: async () => unwrap(api.get(`/workers/${workerId}/assignments`)),
+    enabled: Boolean(workerId),
+  });
+}
