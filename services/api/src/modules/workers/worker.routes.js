@@ -66,6 +66,29 @@ workersRouter.get("/", (0, _rbac.requirePermission)("worker.read"), (0, _errorHa
   };
   res.json(body);
 }));
+/**
+ * Pre-flight duplicate check for the Admin "Add worker" panel (must be
+ * registered before "/:id" — Express matches in registration order).
+ * Answers "is this phone/email already registered?" without writing
+ * anything. When it is, the response carries WHO it belongs to, whether
+ * that worker's documents are verified, and whether the admin may proceed
+ * (verified workers can never be overwritten — the panel shows a hard
+ * error instead of the confirm-warning).
+ */
+workersRouter.get("/check-duplicate", (0, _rbac.requirePermission)("worker.create"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const query = _zod.z.object({
+    phone: _validation.phoneSchema.optional(),
+    email: _zod.z.string().trim().email().optional()
+  }).refine(q => Boolean(q.phone || q.email), {
+    message: "Provide a phone or an email to check."
+  }).parse(req.query);
+  const result = await _worker.WorkerService.checkDuplicate(query);
+  const body = {
+    success: true,
+    data: result
+  };
+  res.json(body);
+}));
 workersRouter.get("/me", (0, _rbac.requirePermission)("worker.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   if (req.auth.role !== "WORKER") {
     throw _AppError.AppError.validation("This endpoint is only for the WORKER role. Use /workers/:id instead.");

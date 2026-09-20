@@ -15,7 +15,14 @@ const workerRegisterSchema = exports.workerRegisterSchema = _zod.z.object({
   email: _zod.z.string().trim().email().optional(),
   workTypeId: _zod.z.string().min(1),
   siteId: _zod.z.string().min(1).optional(),
-  password: _auth.passwordSchema.optional()
+  password: _auth.passwordSchema.optional(),
+  // Duplicate handling: when the phone/email already belongs to an existing
+  // (document-UNverified) worker, the API refuses with a 409 carrying the
+  // duplicate details so the Admin UI can show a warning. The admin must
+  // re-send with confirmDuplicate=true to proceed — the existing account is
+  // then UPDATED in place instead of creating a second account. Document-
+  // VERIFIED workers can never be overwritten, regardless of this flag.
+  confirmDuplicate: _zod.z.boolean().optional()
 });
 // Per-document verification decision (admin side, Registration Step 5 in
 // granular form). A rejection must always carry a reason so the worker knows

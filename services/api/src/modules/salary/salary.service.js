@@ -5,6 +5,7 @@ var _mongoose = require("mongoose");
 var _SalaryLedger = require("../../db/models/SalaryLedger");
 var _WorkerProfile = require("../../db/models/WorkerProfile");
 var _MonthlyPayroll = require("../../db/models/MonthlyPayroll");
+var _Attendance = require("../../db/models/Attendance");
 var _salaryRule = require("./salaryRule.service");
 var _utils = require("@ananta/utils");
 var _AppError = require("../../errors/AppError");
@@ -86,6 +87,117 @@ exports.SalaryService = {
    * when a request transitions to PAID/APPROVED per the payroll rules —
    * never at request-creation time (§13/§14 of spec).
    */
+  /**
+   * REVERSAL of the ledger earnings posted for one attendance record
+   * (matched by ledger.reference = attendance id). Used when an attendance
+   * record is edited (correction) or deleted, so the month rollup never
+   * double-counts the replaced day's earning. Each reversal is a REVERSAL
+   * entry whose debit equals the still-unreversed part of the original
+   * credit — original entries stay in the ledger as an audit trail, and
+   * already-reversed amounts are never reversed twice.
+   */
+  async reverseEarningsForAttendance(attendanceId, params) {
+    const related = await _SalaryLedger.SalaryLedger.find({
+      reference: attendanceId.toString(),
+      type: {
+        $in: ["EARNING", "OVERTIME", "REVERSAL"]
+      }
+    }).sort({
+      createdAt: 1
+    });
+    // Amount already reversed by earlier corrections/deletions of this record.
+    let reversedBudget = 0;
+    for (const entry of related) {
+      if (entry.type === "REVERSAL") reversedBudget += toPaiseNumber(entry.debitPaise);
+    }
+    const created = [];
+    for (const entry of related) {
+      if (entry.type === "REVERSAL") continue;
+      const credit = toPaiseNumber(entry.creditPaise);
+      const alreadyReversed = Math.min(reversedBudget, credit);
+      reversedBudget -= alreadyReversed;
+      const outstanding = credit - alreadyReversed;
+      if (outstanding <= 0) continue;
+      const runningBalance = await getLastRunningBalance(entry.worker);
+      const reversal = await _SalaryLedger.SalaryLedger.create({
+        worker: entry.worker,
+        site: entry.site,
+        date: entry.date,
+        type: "REVERSAL",
+        description: params?.description ?? `Reversal of ${entry.type.toLowerCase()} for deleted/edited attendance`,
+        creditPaise: "0",
+        debitPaise: outstanding.toString(),
+        runningBalancePaise: runningBalance.toString(),
+        reference: entry.reference,
+        createdBy: params?.actorId ?? entry.createdBy
+      });
+      created.push(reversal);
+    }
+    return created;
+  },
+  /**
+   * Attendance day counts for one worker + "YYYY-MM" — shown on the payroll
+   * sheet so every amount can be traced back to days/hours worked.
+   */
+  async getAttendanceSummary(workerId, month) {
+    const [yearStr, monthStr] = month.split("-");
+    const year = Number(yearStr);
+    const monthIndex = Number(monthStr) - 1;
+    const counts = await _Attendance.Attendance.aggregate([{
+      $match: {
+        worker: new _mongoose.Types.ObjectId(workerId),
+        date: {
+          $gte: new Date(Date.UTC(year, monthIndex, 1)),
+          $lte: new Date(Date.UTC(year, monthIndex + 1, 0, 23, 59, 59))
+        }
+      }
+    }, {
+      $group: {
+        _id: "$status",
+        count: {
+          $sum: 1
+        },
+        overtimeHours: {
+          $sum: "$overtimeHours"
+        }
+      }
+    }]);
+    const summary = {
+      presentDays: 0,
+      halfDays: 0,
+      paidLeaveDays: 0,
+      unpaidLeaveDays: 0,
+      absentDays: 0,
+      customDays: 0,
+      markedDays: 0,
+      overtimeHours: 0
+    };
+    for (const row of counts) {
+      summary.markedDays += row.count;
+      // hours can be fractional (e.g. 1.5) — round to one decimal, never float-drift
+      summary.overtimeHours = Math.round((summary.overtimeHours + (row.overtimeHours ?? 0)) * 10) / 10;
+      switch (row._id) {
+        case "PRESENT":
+          summary.presentDays += row.count;
+          break;
+        case "HALF_DAY":
+          summary.halfDays += row.count;
+          break;
+        case "LEAVE_PAID":
+          summary.paidLeaveDays += row.count;
+          break;
+        case "LEAVE_UNPAID":
+          summary.unpaidLeaveDays += row.count;
+          break;
+        case "ABSENT":
+          summary.absentDays += row.count;
+          break;
+        default:
+          summary.customDays += row.count;
+      }
+    }
+    return summary;
+  },
   async postDeduction(params) {
     const workerObjectId = new _mongoose.Types.ObjectId(params.workerId);
     let runningBalance = await getLastRunningBalance(workerObjectId);
@@ -169,6 +281,9 @@ exports.SalaryService = {
       kharchiDeductionsPaise,
       otherDeductionsPaise
     });
+    // Day counts come straight from the attendance records behind the
+    // earnings, so every amount on the payroll sheet is traceable.
+    const attendance = await this.getAttendanceSummary(workerId, month);
     const existing = await _MonthlyPayroll.MonthlyPayroll.findOne({
       worker: workerId,
       month
@@ -189,6 +304,12 @@ exports.SalaryService = {
       kharchiDeductionsPaise,
       otherDeductionsPaise,
       netSalaryPaise,
+      presentDays: attendance.presentDays,
+      halfDays: attendance.halfDays,
+      paidLeaveDays: attendance.paidLeaveDays,
+      unpaidLeaveDays: attendance.unpaidLeaveDays,
+      absentDays: attendance.absentDays,
+      overtimeHours: attendance.overtimeHours,
       status: "CALCULATED"
     }, {
       upsert: true,

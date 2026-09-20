@@ -39,6 +39,32 @@ const monthlyPayrollSchema = new _mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Attendance day counts behind the earnings (filled by recalculateMonth)
+  // so the payroll sheet shows exactly where every amount comes from.
+  presentDays: {
+    type: Number,
+    default: 0
+  },
+  halfDays: {
+    type: Number,
+    default: 0
+  },
+  paidLeaveDays: {
+    type: Number,
+    default: 0
+  },
+  unpaidLeaveDays: {
+    type: Number,
+    default: 0
+  },
+  absentDays: {
+    type: Number,
+    default: 0
+  },
+  overtimeHours: {
+    type: Number,
+    default: 0
+  },
   status: {
     type: String,
     enum: _sharedTypes.PAYROLL_STATUS,

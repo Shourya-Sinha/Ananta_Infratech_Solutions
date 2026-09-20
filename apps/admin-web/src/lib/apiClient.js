@@ -63,11 +63,28 @@ api.interceptors.response.use(
   }
 );
 
-/** Unwraps the {success,data}/{success:false,error} envelope, throwing a readable Error on failure. */
+/**
+ * Unwraps the {success,data}/{success:false,error} envelope, throwing a readable Error on failure.
+ * The thrown Error also carries `code` and `details` from the API envelope so callers can react to
+ * specific error kinds (e.g. the worker-registration duplicate warning) instead of just the message.
+ */
+function enrich(error, envelope) {
+  const e = error instanceof Error ? error : new Error(envelope?.message ?? "Request failed");
+  e.code = envelope?.code;
+  e.details = envelope?.details;
+  return e;
+}
+
 export async function unwrap(promise) {
-  const res = await promise;
+  let res;
+  try {
+    res = await promise;
+  } catch (err) {
+    const envelope = err?.response?.data?.error;
+    throw enrich(err instanceof Error ? err : undefined, envelope);
+  }
   if (res.data.success) return res.data.data;
-  throw new Error(res.data.error.message);
+  throw enrich(undefined, res.data.error);
 }
 
 export { getDeviceId };

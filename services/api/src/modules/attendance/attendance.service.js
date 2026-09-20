@@ -123,6 +123,16 @@ exports.AttendanceService = {
   async correct(params, actorId) {
     const original = await _Attendance.Attendance.findById(params.correctionOf);
     if (!original) throw _AppError.AppError.notFound("Original attendance record not found");
+    if (original.locked) {
+      throw new _AppError.AppError("PAYROLL_LOCKED", "This attendance record's payroll month is finalized. Post a payroll adjustment instead.", 409);
+    }
+    // Reverse the ORIGINAL day's earning first so the corrected earning
+    // doesn't double-count in the month rollup (the original ledger entries
+    // stay as an audit trail; equal REVERSAL debits cancel them out).
+    await _salary.SalaryService.reverseEarningsForAttendance(original._id.toString(), {
+      actorId,
+      description: `Reversal — attendance corrected (${params.reason})`
+    });
     const correction = await _Attendance.Attendance.create({
       worker: original.worker,
       site: original.site,
@@ -151,18 +161,108 @@ exports.AttendanceService = {
     const salaryResult = await _salary.SalaryService.postDailyEarning(correction, actorId);
     const date = original.date;
     const month = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-    if (salaryResult.posted) {
-      // Re-finalization guard lives inside recalculateMonth; a FINALIZED
-      // month requires an explicit adjustment entry via the payroll module,
-      // not a silent recalculation (§43 of spec).
-      await _salary.SalaryService.recalculateMonth(original.worker.toString(), month).catch(() => {
+    // Recalculate whenever the ledger changed — a correction that flips a day
+    // to ABSENT posts no new earning but still posted a reversal above.
+    await _salary.SalaryService.recalculateMonth(original.worker.toString(), month).catch(() => {
 
-        /* if month is finalized/paid, the ledger entry still stands as an audit trail */});
-    }
+      /* if month is finalized/paid, the ledger entry still stands as an audit trail */});
     (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).to(_sharedTypes.ROOMS.site(original.site.toString())).to(_sharedTypes.ROOMS.worker(original.worker.toString())).emit(_sharedTypes.SOCKET_EVENTS.ATTENDANCE_UPDATED, {
-      attendanceId: correction._id.toString()
+      attendanceId: correction._id.toString(),
+      originalAttendanceId: original._id.toString()
     });
-    return correction;
+    return {
+      correction,
+      reversedEntries: true,
+      salaryResult
+    };
+  },
+  /**
+   * ADMIN DELETE: removes an attendance record entirely (e.g. marked by
+   * mistake). The record's salary posting is reversed in the ledger first,
+   * so the month rollup and every payroll figure stay correct. Blocked once
+   * the payroll month is FINALIZED/PAID (records are locked) — the admin
+   * must post an adjustment instead. The ledger keeps the full audit trail;
+   * the per-day slot is freed so attendance can be marked again.
+   */
+  async remove(attendanceId, actorId) {
+    const attendance = await _Attendance.Attendance.findById(attendanceId);
+    if (!attendance) throw _AppError.AppError.notFound("Attendance record not found");
+    if (attendance.locked) {
+      throw new _AppError.AppError("PAYROLL_LOCKED", "This attendance record's payroll month is finalized. Delete is not allowed — post a payroll adjustment instead.", 409);
+    }
+    // Collect the full correction chain rooted at this record (the target
+    // plus any records superseding it) so no stale row for the same day
+    // survives with an already-reversed salary.
+    const chainIds = [attendance._id];
+    let frontier = [attendance._id];
+    while (frontier.length > 0) {
+      const descendants = await _Attendance.Attendance.find({
+        correctionOf: {
+          $in: frontier
+        }
+      });
+      frontier = descendants.map((d) => d._id);
+      chainIds.push(...frontier);
+    }
+    for (const id of chainIds) {
+      if (String(id) === String(attendance._id)) continue;
+      const chained = await _Attendance.Attendance.findById(id);
+      if (chained?.locked) {
+        throw new _AppError.AppError("PAYROLL_LOCKED", "This attendance record's payroll month is finalized. Delete is not allowed — post a payroll adjustment instead.", 409);
+      }
+    }
+    const date = attendance.date;
+    const month = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+    // Reverse the salary posting once for the whole chain (the reversal
+    // helper never reverses an amount twice).
+    const reversals = [];
+    for (const id of chainIds) {
+      const posted = await _salary.SalaryService.reverseEarningsForAttendance(id.toString(), {
+        actorId,
+        description: `Reversal — attendance deleted (${attendance.status}, ${date.toISOString().slice(0, 10)})`
+      });
+      reversals.push(...posted);
+    }
+    await _Attendance.Attendance.deleteMany({
+      _id: {
+        $in: chainIds
+      }
+    });
+    await _audit.AuditService.log({
+      actor: actorId,
+      action: "ATTENDANCE_DELETED",
+      targetType: "Attendance",
+      targetId: attendance._id.toString(),
+      before: {
+        worker: attendance.worker.toString(),
+        site: attendance.site.toString(),
+        date,
+        status: attendance.status,
+        hoursWorked: attendance.hoursWorked,
+        overtimeHours: attendance.overtimeHours,
+        deletedRecords: chainIds.length,
+        reversedLedgerEntries: reversals.length
+      }
+    });
+    // Safe: a locked record would have thrown above, so the month is still open.
+    await _salary.SalaryService.recalculateMonth(attendance.worker.toString(), month).catch(() => {});
+    const io = (0, _gateway.getIO)();
+    io.to(_sharedTypes.ROOMS.admin()).to(_sharedTypes.ROOMS.site(attendance.site.toString())).to(_sharedTypes.ROOMS.worker(attendance.worker.toString())).emit(_sharedTypes.SOCKET_EVENTS.ATTENDANCE_DELETED, {
+      attendanceId: attendance._id.toString(),
+      workerId: attendance.worker.toString(),
+      siteId: attendance.site.toString(),
+      month
+    });
+    if (reversals.length > 0) {
+      io.to(_sharedTypes.ROOMS.admin()).to(_sharedTypes.ROOMS.worker(attendance.worker.toString())).emit(_sharedTypes.SOCKET_EVENTS.SALARY_LEDGER_UPDATED, {
+        workerId: attendance.worker.toString(),
+        month
+      });
+    }
+    return {
+      deleted: true,
+      reversedLedgerEntries: reversals.length
+    };
   },
   async list(filter) {
     const query = {};
@@ -173,7 +273,16 @@ exports.AttendanceService = {
       if (filter.from) query.date.$gte = normalizeDate(filter.from);
       if (filter.to) query.date.$lte = normalizeDate(filter.to);
     }
-    return _Attendance.Attendance.find(query).populate("worker", "employeeId").populate("site", "name code").sort({
+    // Populate the worker's name (nested through WorkerProfile.user) alongside
+    // the employee id so admin views can show who each record belongs to.
+    return _Attendance.Attendance.find(query).populate({
+      path: "worker",
+      select: "employeeId user",
+      populate: {
+        path: "user",
+        select: "name"
+      }
+    }).populate("site", "name code").sort({
       date: -1
     });
   }

@@ -81,9 +81,18 @@ optional initial site in a single call and returns the temporary
 password once, admin document review via GET /workers/:id/documents and
 per-document verify/reject via
 POST /workers/:id/documents/:docId/verify with ownership checks and
-worker notifications) · Documents (ImageKit) · Attendance
+worker notifications) · **Attendance admin CRUD** (admin marks, corrects,
+and deletes attendance for any site from the Admin Web — POST /attendance,
+POST /attendance/bulk, PATCH /attendance/correction and the new
+DELETE /attendance/:id under `attendance.delete`; every create/edit/delete
+posts REVERSAL ledger entries for the affected day BEFORE the corrected
+earning, so the month rollup never double-counts; delete is blocked with
+409 PAYROLL_LOCKED once the month is finalized; correction chains are
+deleted together and their salary reversed exactly once) ·
+Documents (ImageKit) · Attendance
 (record/bulk/correct, duplicate prevention, payroll-lock enforcement) ·
-Salary engine (pure calculation + ledger posting + monthly rollup) ·
+Salary engine (pure calculation + ledger posting + monthly rollup with
+per-worker attendance day counts) ·
 Payroll (calculate/finalize/mark-paid/adjustment-on-finalized-month) ·
 Advances (full REQUESTED→PAID lifecycle) · Kharchi (REQUESTED→APPROVED
 with immediate ledger deduction) · Super Admin direct add
@@ -91,6 +100,20 @@ with immediate ledger deduction) · Super Admin direct add
 worker under `advance.directAdd`/`kharchi.directAdd`, auto-approved with the
 salary deduction posted through the standard pipeline) · Site Finance
 (capital/income/expense/reversal/site & company profit-loss) ·
+**Site Investments** (POST /finance/investments — the admin records money,
+material or equipment put INTO any project/site; GET /finance/investments
+lists them per site; POST /finance/investments/:id/reverse reverses an
+entry; GET /finance/summary returns every site's total investment, total
+expenses, profit/loss and net position plus the company-wide gross
+profit/loss totals; new `site.investment.manage` permission) ·
+**Duplicate-worker guard** (GET /workers/check-duplicate pre-flight check;
+POST /workers/register refuses with a 409 carrying the existing account's
+details when the phone/email already belongs to a document-UNverified
+worker — the Admin UI shows exactly which number/email is already
+registered and asks whether to proceed; on confirmation the EXISTING
+account is updated in place with the new data, same employee ID and
+history preserved; document-VERIFIED workers always hard-fail with
+"number/email already exists" and can never be overwritten) ·
 Notifications (in-app + real Expo push dispatch) · SMS gateway
 (MSG91-backed, dev-mode fallback) · Settings (salary rules, work types) ·
 Support/Chat (tickets + messages) · Audit log read API · Reports
@@ -103,12 +126,29 @@ deep-linked to its full filtered detail view) · Workers list + detail
 (one-step Super Admin "Add worker" registration with credential
 handover, full verification chain, admin-side document upload with
 per-document verify/reject, site assignment) · Sites list + create ·
-Attendance (site/date view) · Payroll (calculate/finalize/mark-paid) ·
-Finance (income/expense entry, site P/L, company-wide P/L view) ·
+Attendance (site/date view) · **Attendance full admin CRUD** (mark
+workers not yet marked — per-row status/hours/overtime or one-click
+"Mark all PRESENT" bulk; edit via correction with mandatory reason; delete
+with automatic salary reversal; locked records shown with a lock badge
+once payroll is finalized) · Payroll (calculate/finalize/mark-paid with
+toast feedback and response counts, per-worker rows showing worker name,
+site, attendance day counts (present/half/paid-leave/absent/OT hours),
+gross, overtime, advance/kharchi/other deductions and net salary, plus a
+site filter and company KPI cards — every amount traceable to days/hours
+worked) ·
+Finance (per-site Investments tab with one-click "Add investment" +
+reversal, income/expense entry, per-site section showing total
+investment / total expenses / profit-loss / net position, an all-sites
+table with a gross totals footer, and company-wide gross profit/loss
+KPI cards) · Add-worker duplicate warning (pre-flight phone/email check —
+unverified duplicate shows "already registered to <worker>, update
+anyway?" confirmation; verified duplicate shows a hard error) ·
 Advances & Kharchi approval queue with Super Admin direct add · Support
 chat · Permission Management
 (per-role toggle matrix) · Audit Logs · Reports (CSV export) · Settings
-(payroll rules) · Work Types management
+(payroll rules) · Work Types management · **Toast notifications**
+(app-wide toast stack — every mutating action surfaces a success toast or
+the server's exact error message, auto-dismissing, with title/body/close)
 
 ### Mobile app (Expo, Manager + Worker) — modern animated design
 

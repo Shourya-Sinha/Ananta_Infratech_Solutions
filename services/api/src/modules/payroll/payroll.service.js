@@ -56,9 +56,24 @@ exports.PayrollService = {
     return results;
   },
   async getMonth(month) {
+    // Populate enough of each worker to show name + site + daily rate on the
+    // payroll sheet, so admin can filter "each worker payment of a site".
     return _MonthlyPayroll.MonthlyPayroll.find({
       month
-    }).populate("worker", "employeeId");
+    }).populate({
+      path: "worker",
+      select: "employeeId user currentSite workType",
+      populate: [{
+        path: "user",
+        select: "name"
+      }, {
+        path: "currentSite",
+        select: "name code"
+      }, {
+        path: "workType",
+        select: "name defaultDailyRatePaise"
+      }]
+    });
   },
   async getWorkerMonth(workerId, month) {
     const payroll = await _MonthlyPayroll.MonthlyPayroll.findOne({

@@ -34,10 +34,24 @@ attendanceRouter.post("/bulk", (0, _rbac.requirePermission)("attendance.create")
 }));
 attendanceRouter.patch("/correction", (0, _rbac.requirePermission)("attendance.update"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   const input = _validation.attendanceCorrectionSchema.parse(req.body);
-  const correction = await _attendance.AttendanceService.correct(input, req.auth.userId);
+  const result = await _attendance.AttendanceService.correct(input, req.auth.userId);
   const body = {
     success: true,
-    data: correction
+    data: result
+  };
+  res.json(body);
+}));
+/**
+ * ADMIN delete: removes a mistakenly-marked attendance record. The salary
+ * posting is reversed in the ledger first and the month rollup is
+ * recalculated, so payroll always matches the remaining attendance.
+ * Blocked (409 PAYROLL_LOCKED) once the month is finalized.
+ */
+attendanceRouter.delete("/:id", (0, _rbac.requirePermission)("attendance.delete"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const result = await _attendance.AttendanceService.remove(req.params.id, req.auth.userId);
+  const body = {
+    success: true,
+    data: result
   };
   res.json(body);
 }));

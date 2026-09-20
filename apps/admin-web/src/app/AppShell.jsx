@@ -17,6 +17,7 @@ import {
 import { useAuthStore } from "@/stores/authStore";
 import { useLogout } from "@/features/auth/api";
 import { NotificationBell } from "@/components/ui/NotificationBell";
+import { ToastProvider } from "@/components/ui/Toast";
 import { cx } from "@/lib/format";
 
 const NAV_GROUPS =
@@ -64,6 +65,7 @@ export function AppShell() {
   const logout = useLogout();
 
   return (
+    <ToastProvider>
     <div className="flex min-h-screen bg-paper">
       <aside className="flex w-60 shrink-0 flex-col border-r border-steel-200 bg-surface">
         <div className="border-b border-steel-200 px-5 py-4">
@@ -124,6 +126,7 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
-    </div>);
+    </div>
+    </ToastProvider>);
 
 }

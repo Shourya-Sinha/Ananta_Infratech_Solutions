@@ -31,6 +31,48 @@ financeRouter.post("/capital", (0, _rbac.requirePermission)("site.capital.manage
   res.status(201).json(body);
 }));
 
+// --- Investments (admin puts money into a project/site) ----------------
+
+const addInvestmentSchema = _zod.z.object({
+  siteId: _zod.z.string().min(1),
+  amountRupees: _zod.z.number().positive(),
+  type: _zod.z.enum(_Finance.INVESTMENT_TYPES).default("CASH"),
+  date: _zod.z.string().date(),
+  reference: _zod.z.string().trim().max(200).optional(),
+  note: _zod.z.string().trim().max(500).optional()
+});
+const manageInvestmentPermission = (0, _rbac.requireAnyPermission)("site.investment.manage", "site.capital.manage");
+financeRouter.post("/investments", manageInvestmentPermission, (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const input = addInvestmentSchema.parse(req.body);
+  const investment = await _finance.FinanceService.addInvestment(input, req.auth.userId);
+  const body = {
+    success: true,
+    data: investment
+  };
+  res.status(201).json(body);
+}));
+financeRouter.get("/investments", (0, _rbac.requireAnyPermission)("financialReports.read", "site.investment.manage", "site.capital.manage"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const query = _zod.z.object({
+    site: _zod.z.string().optional(),
+    from: _zod.z.string().date().optional(),
+    to: _zod.z.string().date().optional()
+  }).parse(req.query);
+  const investments = await _finance.FinanceService.listInvestments(query);
+  const body = {
+    success: true,
+    data: investments
+  };
+  res.json(body);
+}));
+financeRouter.post("/investments/:id/reverse", manageInvestmentPermission, (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const reversal = await _finance.FinanceService.reverseInvestment(req.params.id, req.auth.userId);
+  const body = {
+    success: true,
+    data: reversal
+  };
+  res.status(201).json(body);
+}));
+
 // --- Income / Expense --------------------------------------------------
 
 const incomeSchema = _zod.z.object({
@@ -128,6 +170,24 @@ financeRouter.get("/company/profit-loss", (0, _rbac.requirePermission)("financia
     to: _zod.z.string().date().optional()
   }).parse(req.query);
   const result = await _finance.FinanceService.getCompanyProfitLoss(query);
+  const body = {
+    success: true,
+    data: result
+  };
+  res.json(body);
+}));
+
+/**
+ * Gross summary: EVERY site's total investment / income / total expenses /
+ * profit-loss plus the company-wide gross totals (Σ across all sites).
+ * Powers the Finance page's per-site table and gross profit/loss cards.
+ */
+financeRouter.get("/summary", (0, _rbac.requirePermission)("financialReports.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const query = _zod.z.object({
+    from: _zod.z.string().date().optional(),
+    to: _zod.z.string().date().optional()
+  }).parse(req.query);
+  const result = await _finance.FinanceService.getGrossSummary(query);
   const body = {
     success: true,
     data: result
