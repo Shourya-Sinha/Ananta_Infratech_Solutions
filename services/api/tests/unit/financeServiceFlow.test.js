@@ -9,7 +9,7 @@ jest.mock("../../src/db/models/Finance", () => ({
   INVESTMENT_TYPES: ["CASH", "MATERIAL", "EQUIPMENT", "LABOUR_ADVANCE", "OTHER"]
 }));
 jest.mock("../../src/db/models/SalaryLedger", () => ({
-  SalaryLedger: { aggregate: jest.fn() }
+  SalaryLedger: { aggregate: jest.fn(), find: jest.fn() }
 }));
 jest.mock("../../src/db/models/Site", () => ({
   Site: { findById: jest.fn(), find: jest.fn() }
@@ -89,6 +89,21 @@ describe("FinanceService.getSiteProfitLoss (with investments)", () => {
     expect(result.netPosition).toBe(-6500); // 3500 − 10000
   });
 
+  test("site expenses include paid worker payouts from the salary ledger", async () => {
+    Finance.FinancialTransaction.aggregate.mockResolvedValue([]);
+    SalaryLedger.aggregate
+      .mockResolvedValueOnce([]) // accrued labour
+      .mockResolvedValueOnce([{ total: 1_25_000 }]); // ₹1,250 advance/Kharchi payout
+    Finance.SiteInvestment.aggregate.mockResolvedValue([]);
+    Finance.SiteInvestment.countDocuments.mockResolvedValueOnce(0);
+    Finance.SiteCapital.aggregate.mockResolvedValue([]);
+
+    const result = await FinanceService.getSiteProfitLoss(siteId);
+
+    expect(result.workerPayouts).toBe(1250);
+    expect(result.totalExpenses).toBe(1250);
+  });
+
   test("reversed investments are subtracted from the total", async () => {
     Finance.FinancialTransaction.aggregate.mockResolvedValue([]);
     SalaryLedger.aggregate.mockResolvedValue([]);
@@ -156,5 +171,34 @@ describe("FinanceService.getGrossSummary (per-site rows + company gross totals)"
     expect(t.grossLoss).toBe(6000);
     expect(t.grossProfitLoss).toBe(4000); // Σ site profit/loss
     expect(t.netPosition).toBe(-3000); // after recovering all investments
+  });
+
+  test("gross totals include advances/Kharchi on their related site", async () => {
+    Site.find.mockReturnValueOnce({
+      select: jest.fn().mockReturnThis(),
+      sort: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue([siteDoc])
+    });
+    Finance.FinancialTransaction.aggregate.mockResolvedValueOnce([
+      { _id: { site: siteId, direction: "INCOME" }, total: 10_00_000 },
+      { _id: { site: siteId, direction: "EXPENSE" }, total: 2_00_000 }
+    ]);
+    SalaryLedger.aggregate
+      .mockResolvedValueOnce([{ _id: siteId, total: 1_00_000 }]) // labour
+      .mockResolvedValueOnce([{ _id: siteId, total: 3_00_000 }]); // worker payout
+    Finance.SiteInvestment.aggregate.mockResolvedValueOnce([]);
+
+    const summary = await FinanceService.getGrossSummary({});
+
+    expect(summary.sites[0]).toMatchObject({
+      workerPayouts: 3000,
+      totalExpenses: 6000,
+      profitLoss: 4000
+    });
+    expect(summary.totals).toMatchObject({
+      totalWorkerPayouts: 3000,
+      totalExpenses: 6000,
+      grossProfitLoss: 4000
+    });
   });
 });

@@ -70,6 +70,7 @@ exports.AdvanceService = {
         siteId,
         type: "ADVANCE_DEDUCTION",
         amountPaise,
+        date: request.requestedDate,
         description: `Advance payout (added by Super Admin) — ${input.reason}`,
         reference: request._id.toString(),
         actorId: input.actorId
@@ -192,6 +193,7 @@ exports.AdvanceService = {
       siteId: resolvedSiteId,
       type: "ADVANCE_DEDUCTION",
       amountPaise: request.approvedAmountPaise ?? request.amountPaise,
+      date: request.requestedDate,
       description: `Advance payout — ${request.reason}`,
       reference: request._id.toString(),
       actorId: paidBy
