@@ -61,6 +61,29 @@ export function DashboardPage() {
     retry: false,
   });
 
+  const { data: budgetAlerts } = useQuery({
+    queryKey: ["finance", "budget-alerts"],
+    queryFn: async () => unwrap(api.get("/finance/budget-alerts")),
+  });
+
+  const { data: materials } = useQuery({
+    queryKey: ["materials", "all-short"],
+    queryFn: async () => unwrap(api.get("/materials")),
+    retry: false,
+  });
+
+  const { data: equipment } = useQuery({
+    queryKey: ["equipment", "all-short"],
+    queryFn: async () => unwrap(api.get("/equipment")),
+    retry: false,
+  });
+
+  const { data: diary } = useQuery({
+    queryKey: ["diary", "recent"],
+    queryFn: async () => unwrap(api.get("/site-diary")),
+    retry: false,
+  });
+
   useSocketInvalidate("attendance:created", [["finance", "company-profit-loss"]]);
   useSocketInvalidate("site:profit_updated", [["finance", "company-profit-loss"]]);
   useSocketInvalidate("site:created", [["sites"]]);
@@ -79,12 +102,17 @@ export function DashboardPage() {
     : [];
 
   const openTickets = supportTickets?.filter((t) => t.status === "OPEN" || t.status === "IN_PROGRESS").length ?? "—";
+  const lowStockCount = (materials ?? []).filter((m) => Number(m.currentStock) <= Number(m.reorderLevel)).length;
+  const overBudgetCount = (budgetAlerts ?? []).filter((a) => a.level === "OVER_BUDGET").length;
+  const warningBudgetCount = (budgetAlerts ?? []).filter((a) => a.level === "WARNING").length;
+  const equipmentAssigned = (equipment ?? []).filter((e) => e.status === "ASSIGNED").length;
+  const diaryToday = (diary ?? []).filter((d) => { const x = new Date(d.date); const t = new Date(); return x.toDateString() === t.toDateString(); }).length;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-xl font-semibold text-graphite-900">Dashboard</h1>
-        <p className="text-sm text-graphite-500">Company-wide overview, live. Covers sites, workforce, finance & operations.</p>
+        <p className="text-sm text-graphite-500">Company-wide overview, live. Covers sites, workforce, finance, procurement & operations.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -99,6 +127,13 @@ export function DashboardPage() {
         <KpiCard label="Pending requests" value={String((pendingAdvances?.length ?? 0) + (pendingKharchi?.length ?? 0))} sublabel="Advances + Kharchi" onClick={() => navigate("/requests")} />
         <KpiCard label="Open support" value={String(openTickets)} onClick={() => navigate("/support")} />
         <KpiCard label="Total investment" value={summary ? formatINR(summary.totals.totalInvestment) : "—"} sublabel="Admin capital in sites" onClick={() => navigate("/finance")} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <KpiCard label="Materials low stock" value={String(lowStockCount)} tone={lowStockCount > 0 ? "negative" : "positive"} onClick={() => navigate("/materials")} />
+        <KpiCard label="Equipment assigned" value={String(equipmentAssigned)} sublabel={`of ${equipment?.length ?? 0} total`} onClick={() => navigate("/equipment")} />
+        <KpiCard label="Sites over budget" value={String(overBudgetCount)} tone={overBudgetCount > 0 ? "negative" : "positive"} sublabel={`${warningBudgetCount} warning`} onClick={() => navigate("/finance?tab=budget-alerts")} />
+        <KpiCard label="Diary entries today" value={String(diaryToday)} onClick={() => navigate("/site-diary")} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

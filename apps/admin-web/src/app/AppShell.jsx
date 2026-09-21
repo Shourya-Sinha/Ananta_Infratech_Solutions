@@ -13,7 +13,11 @@ import {
   ShieldCheck,
   ScrollText,
   Settings,
-  LogOut } from
+  LogOut,
+  Truck,
+  Package,
+  Wrench,
+  BookOpen } from
 "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useLogout } from "@/features/auth/api";
@@ -42,6 +46,20 @@ const NAV_GROUPS =
 {
   label: "Finance",
   items: [{ to: "/finance", label: "Income, Expenses & P/L", icon: Receipt }]
+},
+{
+  label: "Procurement",
+  items: [
+    { to: "/suppliers", label: "Suppliers / Vendors", icon: Truck },
+    { to: "/materials", label: "Materials & Inventory", icon: Package }
+  ]
+},
+{
+  label: "Operations",
+  items: [
+    { to: "/equipment", label: "Equipment & Tools", icon: Wrench },
+    { to: "/site-diary", label: "Site Diary", icon: BookOpen }
+  ]
 },
 {
   label: "Requests",

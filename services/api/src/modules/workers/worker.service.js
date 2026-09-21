@@ -50,7 +50,7 @@ exports.WorkerService = {
     //   }
     // });
     try {
-      await AuditService.log({
+      await _audit.AuditService.log({
         actor: params.createdBy,
         action: "WORKER_PROFILE_CREATED",
         targetType: "WorkerProfile",

@@ -157,7 +157,11 @@ financeRouter.post("/transactions/:id/reverse", (0, _rbac.requirePermission)("si
 // --- Profit / Loss -------------------------------------------------------
 
 financeRouter.get("/site/:id/profit-loss", (0, _rbac.requirePermission)("financialReports.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
-  const result = await _finance.FinanceService.getSiteProfitLoss(req.params.id);
+  const query = _zod.z.object({
+    from: _zod.z.string().date().optional(),
+    to: _zod.z.string().date().optional()
+  }).parse(req.query);
+  const result = await _finance.FinanceService.getSiteProfitLoss(req.params.id, query);
   const body = {
     success: true,
     data: result
@@ -193,4 +197,49 @@ financeRouter.get("/summary", (0, _rbac.requirePermission)("financialReports.rea
     data: result
   };
   res.json(body);
+}));
+
+// --- Company expenses (office/admin, not site-specific) -----------------
+
+const COMPANY_EXPENSE_CATEGORIES = ["OFFICE_RENT", "UTILITIES", "SALARIES_OFFICE", "TRAVEL", "MARKETING", "LEGAL", "ACCOUNTING", "INSURANCE", "MAINTENANCE", "OTHER"];
+const companyExpenseSchema = _zod.z.object({
+  category: _zod.z.enum(COMPANY_EXPENSE_CATEGORIES),
+  amountRupees: _zod.z.number().positive(),
+  date: _zod.z.string().date(),
+  description: _zod.z.string().trim().max(500).optional(),
+  paidTo: _zod.z.string().trim().max(200).optional(),
+  reference: _zod.z.string().trim().max(200).optional()
+});
+financeRouter.post("/company-expenses", (0, _rbac.requirePermission)("company.expense.create"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const input = companyExpenseSchema.parse(req.body);
+  const expense = await _finance.FinanceService.addCompanyExpense(input, req.auth.userId);
+  res.status(201).json({ success: true, data: expense });
+}));
+financeRouter.get("/company-expenses", (0, _rbac.requireAnyPermission)("company.expense.read", "financialReports.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const query = _zod.z.object({
+    from: _zod.z.string().date().optional(),
+    to: _zod.z.string().date().optional()
+  }).parse(req.query);
+  const expenses = await _finance.FinanceService.listCompanyExpenses(query);
+  res.json({ success: true, data: expenses });
+}));
+financeRouter.post("/company-expenses/:id/reverse", (0, _rbac.requirePermission)("company.expense.delete"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const reversal = await _finance.FinanceService.reverseCompanyExpense(req.params.id, req.auth.userId);
+  res.status(201).json({ success: true, data: reversal });
+}));
+
+// --- Site cash flow (worker payouts view) ------------------------------
+financeRouter.get("/site/:id/cash-flow", (0, _rbac.requirePermission)("financialReports.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const query = _zod.z.object({
+    from: _zod.z.string().date().optional(),
+    to: _zod.z.string().date().optional()
+  }).parse(req.query);
+  const result = await _finance.FinanceService.getSiteCashFlow(req.params.id, query);
+  res.json({ success: true, data: result });
+}));
+
+// --- Budget vs actual alerts -------------------------------------------
+financeRouter.get("/budget-alerts", (0, _rbac.requirePermission)("financialReports.read"), (0, _errorHandler.asyncHandler)(async (_req, res) => {
+  const alerts = await _finance.FinanceService.getBudgetAlerts();
+  res.json({ success: true, data: alerts });
 }));

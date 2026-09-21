@@ -253,11 +253,34 @@ exports.FinanceService = {
    * pulled from the salary ledger (credits = wages earned on this site),
    * admin INVESTMENTS (new), and a net project position.
    */
-  async getSiteProfitLoss(siteId) {
+  /**
+   * Build the date filter $match for a SalaryLedger aggregation. Note:
+   * SalaryLedger `date` represents when the earning/deduction was actually
+   * incurred, so applying a date range is correct for P&L — previously
+   * the labour aggregations ignored this filter and produced inflated
+   * numbers when used with a date range (bug fix).
+   */
+  _buildLabourMatch(siteId, dateFilter) {
+    const match = {
+      type: {
+        $in: ["EARNING", "OVERTIME"]
+      }
+    };
+    if (siteId) match.site = new _mongoose.Types.ObjectId(siteId);
+    if (dateFilter.date) match.date = dateFilter.date;
+    return match;
+  },
+  async getSiteProfitLoss(siteId, filter) {
     const site = await _Site.Site.findById(siteId);
     if (!site) throw _AppError.AppError.notFound("Site not found");
     const mongoose = _mongoose;
     const siteObjectId = new mongoose.Types.ObjectId(siteId);
+    const dateFilter = {};
+    if (filter?.from || filter?.to) {
+      dateFilter.date = {};
+      if (filter.from) dateFilter.date.$gte = new Date(filter.from);
+      if (filter.to) dateFilter.date.$lte = new Date(filter.to);
+    }
     const [incomeAgg, expenseAgg, labourAgg, investmentAgg, investmentCount, capitalTotal] = await Promise.all([_Finance.FinancialTransaction.aggregate([{
       $match: {
         site: siteObjectId,
@@ -285,9 +308,8 @@ exports.FinanceService = {
     }]), _SalaryLedger.SalaryLedger.aggregate([{
       $match: {
         site: siteObjectId,
-        type: {
-          $in: ["EARNING", "OVERTIME"]
-        }
+        type: { $in: ["EARNING", "OVERTIME"] },
+        ...(dateFilter.date ? { date: dateFilter.date } : {})
       }
     }, {
       $group: {
@@ -381,9 +403,8 @@ exports.FinanceService = {
       }
     }]), _SalaryLedger.SalaryLedger.aggregate([{
       $match: {
-        type: {
-          $in: ["EARNING", "OVERTIME"]
-        }
+        type: { $in: ["EARNING", "OVERTIME"] },
+        ...(dateFilter.date ? { date: dateFilter.date } : {})
       }
     }, {
       $group: {
@@ -468,9 +489,8 @@ exports.FinanceService = {
       }
     }]), _SalaryLedger.SalaryLedger.aggregate([{
       $match: {
-        type: {
-          $in: ["EARNING", "OVERTIME"]
-        }
+        type: { $in: ["EARNING", "OVERTIME"] },
+        ...(dateFilter.date ? { date: dateFilter.date } : {})
       }
     }, {
       $group: {
@@ -550,5 +570,136 @@ exports.FinanceService = {
         siteCount: sites.length
       }
     };
+  },
+
+  // --- Company expenses (office/admin, not site-specific) --------------
+  async addCompanyExpense(input, actorId) {
+    const expense = await _Finance.CompanyExpense.create({
+      category: input.category,
+      amountPaise: (0, _utils.rupeesToPaise)(input.amountRupees),
+      date: new Date(input.date),
+      description: input.description,
+      paidTo: input.paidTo,
+      reference: input.reference,
+      createdBy: actorId
+    });
+    await _audit.AuditService.log({
+      actor: actorId,
+      action: "COMPANY_EXPENSE_ADDED",
+      targetType: "CompanyExpense",
+      targetId: expense._id.toString(),
+      after: { amountRupees: input.amountRupees, category: input.category }
+    });
+    (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).emit(_sharedTypes.SOCKET_EVENTS.COMPANY_EXPENSE_ADDED, { expenseId: expense._id.toString() });
+    return expense;
+  },
+  async reverseCompanyExpense(expenseId, actorId) {
+    const original = await _Finance.CompanyExpense.findById(expenseId);
+    if (!original) throw _AppError.AppError.notFound("Company expense not found");
+    if (original.reversalOf) throw _AppError.AppError.validation("Cannot reverse a reversal entry.");
+    const reversal = await _Finance.CompanyExpense.create({
+      category: original.category,
+      amountPaise: original.amountPaise,
+      date: new Date(),
+      description: `Reversal of company expense ${original._id.toString()}`,
+      paidTo: original.paidTo,
+      reference: original.reference,
+      createdBy: actorId,
+      reversalOf: original._id
+    });
+    await _audit.AuditService.log({ actor: actorId, action: "COMPANY_EXPENSE_REVERSED", targetType: "CompanyExpense", targetId: reversal._id.toString() });
+    (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).emit(_sharedTypes.SOCKET_EVENTS.COMPANY_EXPENSE_REVERSED, { expenseId: reversal._id.toString() });
+    return reversal;
+  },
+  async listCompanyExpenses(filter) {
+    const query = {};
+    if (filter.from || filter.to) {
+      query.date = {};
+      if (filter.from) query.date.$gte = new Date(filter.from);
+      if (filter.to) query.date.$lte = new Date(filter.to);
+    }
+    return _Finance.CompanyExpense.find(query).sort({ date: -1 });
+  },
+
+  // --- Cash flow: actual cash paid OUT to workers (advances/kharchi/settlements) -
+  // These are separate from accrual P&L labour cost. This answers the question
+  // "show me the cash paid out on this site to workers this week/month".
+  async getSiteCashFlow(siteId, filter) {
+    const siteObjectId = new _mongoose.Types.ObjectId(siteId);
+    const dateMatch = {};
+    if (filter?.from || filter?.to) {
+      dateMatch.date = {};
+      if (filter.from) dateMatch.date.$gte = new Date(filter.from);
+      if (filter.to) dateMatch.date.$lte = new Date(filter.to);
+    }
+    // Worker payouts: salary ledger debits (ADVANCE_DEDUCTION / KHARCHI_DEDUCTION)
+    // on this site = cash paid out as advances/kharchi.
+    const payoutAgg = await _SalaryLedger.SalaryLedger.aggregate([{
+      $match: {
+        site: siteObjectId,
+        type: { $in: ["ADVANCE_DEDUCTION", "KHARCHI_DEDUCTION"] },
+        ...(dateMatch.date ? { date: dateMatch.date } : {})
+      }
+    }, {
+      $group: {
+        _id: "$type",
+        total: { $sum: { $toDouble: "$debitPaise" } }
+      }
+    }]);
+    let advancePaidPaise = 0;
+    let kharchiPaidPaise = 0;
+    for (const r of payoutAgg) {
+      if (r._id === "ADVANCE_DEDUCTION") advancePaidPaise = Math.round(r.total);
+      else if (r._id === "KHARCHI_DEDUCTION") kharchiPaidPaise = Math.round(r.total);
+    }
+    const totalPayoutPaise = (0, _utils.addPaise)(advancePaidPaise, kharchiPaidPaise);
+    // Individual payout entries
+    const payouts = await _SalaryLedger.SalaryLedger.find({
+      site: siteObjectId,
+      type: { $in: ["ADVANCE_DEDUCTION", "KHARCHI_DEDUCTION"] },
+      ...(dateMatch.date ? { date: dateMatch.date } : {})
+    }).populate("worker", "employeeId").sort({ date: -1 }).limit(200);
+    return {
+      siteId,
+      advancePaid: (0, _utils.paiseToRupees)(advancePaidPaise),
+      kharchiPaid: (0, _utils.paiseToRupees)(kharchiPaidPaise),
+      totalPayoutToWorkers: (0, _utils.paiseToRupees)(totalPayoutPaise),
+      payouts: payouts.map(p => ({
+        _id: p._id,
+        date: p.date,
+        type: p.type,
+        description: p.description,
+        amount: (0, _utils.paiseToRupees)(Number(p.debitPaise.toString())),
+        workerEmployeeId: p.worker?.employeeId,
+        reference: p.reference
+      }))
+    };
+  },
+
+  // --- Budget vs Actual alerts ------------------------------------------
+  async getBudgetAlerts() {
+    const sites = await _Site.Site.find({ budgetPaise: { $gt: 0 } });
+    const alerts = [];
+    for (const site of sites) {
+      const pnl = await this.getSiteProfitLoss(site._id.toString());
+      const spent = (0, _utils.rupeesToPaise)(pnl.totalExpenses);
+      const budget = site.budgetPaise;
+      const utilizationPct = budget > 0 ? (spent / budget) * 100 : 0;
+      let level = "OK";
+      if (utilizationPct >= 100) level = "OVER_BUDGET";
+      else if (utilizationPct >= 80) level = "WARNING";
+      alerts.push({
+        siteId: site._id.toString(),
+        siteName: site.name,
+        siteCode: site.code,
+        budgetPaise: budget,
+        budgetRupees: (0, _utils.paiseToRupees)(budget),
+        spentPaise: spent,
+        spentRupees: pnl.totalExpenses,
+        utilizationPct: Math.round(utilizationPct * 10) / 10,
+        level
+      });
+    }
+    return alerts;
   }
 };

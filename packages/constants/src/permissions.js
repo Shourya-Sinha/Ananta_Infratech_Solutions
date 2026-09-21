@@ -199,6 +199,96 @@ const PERMISSIONS = exports.PERMISSIONS = [
   group: "Audit",
   description: "View audit logs"
 },
+// Company expenses (office, not site)
+{
+  key: "company.expense.create",
+  group: "Finance",
+  description: "Record company-wide expenses (office, admin)"
+}, {
+  key: "company.expense.delete",
+  group: "Finance",
+  description: "Reverse/delete company expenses"
+}, {
+  key: "company.expense.read",
+  group: "Finance",
+  description: "View company expenses"
+},
+// Suppliers / Vendors
+{
+  key: "supplier.create",
+  group: "Procurement",
+  description: "Create supplier/vendor records"
+}, {
+  key: "supplier.update",
+  group: "Procurement",
+  description: "Edit supplier/vendor records"
+}, {
+  key: "supplier.read",
+  group: "Procurement",
+  description: "View supplier/vendor records"
+}, {
+  key: "supplier.delete",
+  group: "Procurement",
+  description: "Delete supplier/vendor records"
+},
+// Materials / Inventory
+{
+  key: "material.create",
+  group: "Procurement",
+  description: "Add materials to inventory"
+}, {
+  key: "material.update",
+  group: "Procurement",
+  description: "Update material stock"
+}, {
+  key: "material.read",
+  group: "Procurement",
+  description: "View inventory/materials"
+}, {
+  key: "material.delete",
+  group: "Procurement",
+  description: "Delete material entries"
+}, {
+  key: "material.issue",
+  group: "Procurement",
+  description: "Issue materials to a site"
+},
+// Equipment / Tools
+{
+  key: "equipment.create",
+  group: "Equipment",
+  description: "Add equipment/tools"
+}, {
+  key: "equipment.update",
+  group: "Equipment",
+  description: "Edit equipment/tool records"
+}, {
+  key: "equipment.read",
+  group: "Equipment",
+  description: "View equipment/tools"
+}, {
+  key: "equipment.assign",
+  group: "Equipment",
+  description: "Assign equipment to a site"
+},
+// Site Diary / Daily Log
+{
+  key: "diary.create",
+  group: "SiteDiary",
+  description: "Create site daily log entries"
+}, {
+  key: "diary.update",
+  group: "SiteDiary",
+  description: "Edit daily log entries"
+}, {
+  key: "diary.read",
+  group: "SiteDiary",
+  description: "View site daily logs"
+}, {
+  key: "diary.delete",
+  group: "SiteDiary",
+  description: "Delete daily log entries"
+},
 // Comms
 {
   key: "support.chat",
@@ -221,6 +311,6 @@ const PERMISSION_KEYS = exports.PERMISSION_KEYS = PERMISSIONS.map(p => p.key);
 const DEFAULT_ROLE_PERMISSIONS = exports.DEFAULT_ROLE_PERMISSIONS = {
   SUPER_ADMIN: PERMISSION_KEYS,
   // full access
-  MANAGER: ["worker.create", "worker.read", "attendance.create", "attendance.read", "advance.create", "advance.read", "kharchi.create", "kharchi.read", "site.read", "support.chat"],
+  MANAGER: ["worker.create", "worker.read", "attendance.create", "attendance.read", "advance.create", "advance.read", "kharchi.create", "kharchi.read", "site.read", "support.chat", "company.expense.read", "supplier.read", "material.read", "material.issue", "equipment.read", "equipment.assign", "diary.create", "diary.read", "diary.update", "financialReports.read"],
   WORKER: ["worker.read", "attendance.read", "salary.read", "advance.create", "advance.read", "kharchi.create", "kharchi.read", "support.chat"]
 };
