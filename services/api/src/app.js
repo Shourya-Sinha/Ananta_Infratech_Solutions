@@ -27,6 +27,10 @@ var _support = require("./modules/support/support.routes");
 var _auditLog = require("./modules/auditLogs/auditLog.routes");
 var _report = require("./modules/reports/report.routes");
 var _role = require("./modules/permissions/role.routes");
+var _supplier = require("./modules/suppliers/supplier.routes");
+var _material = require("./modules/materials/material.routes");
+var _equipment = require("./modules/equipment/equipment.routes");
+var _diary = require("./modules/diary/diary.routes");
 var _openapi = require("./config/openapi");
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function createApp() {
@@ -76,6 +80,10 @@ function createApp() {
   app.use("/api/v1/audit-logs", _auditLog.auditLogsRouter);
   app.use("/api/v1/reports", _report.reportsRouter);
   app.use("/api/v1/roles", _role.rolesRouter);
+  app.use("/api/v1/suppliers", _supplier.supplierRouter);
+  app.use("/api/v1/materials", _material.materialRouter);
+  app.use("/api/v1/equipment", _equipment.equipmentRouter);
+  app.use("/api/v1/site-diary", _diary.diaryRouter);
   // Every module from the architecture doc (§33 API design) is now mounted.
 
   app.use(_errorHandler.notFoundHandler);

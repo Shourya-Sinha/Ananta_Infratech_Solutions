@@ -17,6 +17,10 @@ import { ReportsPage } from "@/features/reports/ReportsPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { WorkTypesPage } from "@/features/workTypes/WorkTypesPage";
 import { UsersPage } from "@/features/users/UsersPage";
+import { SuppliersPage } from "@/features/suppliers/SuppliersPage";
+import { MaterialsPage } from "@/features/materials/MaterialsPage";
+import { EquipmentPage } from "@/features/equipment/EquipmentPage";
+import { SiteDiaryPage } from "@/features/diary/SiteDiaryPage";
 
 export function AppRouter() {
   return (
@@ -40,6 +44,10 @@ export function AppRouter() {
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/work-types" element={<WorkTypesPage />} />
+          <Route path="/suppliers" element={<SuppliersPage />} />
+          <Route path="/materials" element={<MaterialsPage />} />
+          <Route path="/equipment" element={<EquipmentPage />} />
+          <Route path="/site-diary" element={<SiteDiaryPage />} />
         </Route>
       </Route>
 
