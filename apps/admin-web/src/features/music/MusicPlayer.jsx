@@ -322,15 +322,25 @@ export function MusicProvider({ children }) {
 
     let directory = null;
     try {
-      directory = await window.showDirectoryPicker({ mode: "read", id: "ananta-music-library" });
+      // `startIn: "music"` opens the OS music library (not the app/download
+      // folder) as a starting point. The dialog is a normal system file dialog,
+      // so any folder on any drive can still be navigated to and selected.
+      directory = await window.showDirectoryPicker({ mode: "read", startIn: "music" });
     } catch (error) {
       if (error?.name === "AbortError") return;
-      // Picker unavailable/blocked (iframe, policy) - use the input fallback.
-      if (!openFolderInput()) {
-        setScanError("The folder picker was blocked by the browser. Use “Add songs” instead.");
+      // Some builds reject unknown `startIn` values - retry without it.
+      try {
+        directory = await window.showDirectoryPicker({ mode: "read" });
+      } catch (retryError) {
+        if (retryError?.name === "AbortError") return;
+        if (!openFolderInput()) {
+          setScanError("The folder picker was blocked by the browser. Use “Add songs” instead.");
+        }
+        return;
       }
-      return;
     }
+
+    if (!directory) return;
 
     setIsScanning(true);
     try {
@@ -659,7 +669,7 @@ export function MusicPlayer() {
               <Upload size={15} /> Add songs
             </button>
           </div>
-          <p className="music-help">To scan a whole drive, choose its root folder when the browser picker opens. Silent drive scanning is blocked by browser security.</p>
+          <p className="music-help">Opens your system file dialog — pick any folder on any drive (C:, D:, external disks). All sub-folders are scanned. Browsers cannot read a drive without you choosing it first.</p>
 
           {music.tracks.length > 0 && (
             <div className="music-library-list">

@@ -51,6 +51,10 @@ const envSchema = z.object({
   PUSH_NOTIFICATIONS_ENABLED: z.coerce.boolean().default(true),
 
   FIREBASE_SERVICE_ACCOUNT_JSON: z.string().optional(),
+
+  // Optional. When set, the admin video search uses the official YouTube Data
+  // API; without it the service falls back to parsing the public results page.
+  YOUTUBE_API_KEY: z.string().optional(),
 });
 
 function loadEnv() {
