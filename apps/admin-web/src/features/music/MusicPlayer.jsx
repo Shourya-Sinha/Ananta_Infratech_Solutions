@@ -45,16 +45,29 @@ function safeInitialVolume() {
   }
 }
 
+function fileExtension(name = "") {
+  const dot = name.lastIndexOf(".");
+  if (dot < 1) return "";
+  return name.slice(dot + 1).toLowerCase();
+}
+
+// A name-only check, used while walking a directory tree before the File object exists.
+function hasAudioExtension(name) {
+  return AUDIO_EXTENSIONS.has(fileExtension(name));
+}
+
 function isAudioFile(file) {
   if (!file) return false;
-  if (file.type?.startsWith("audio/")) return true;
-  const name = file.name ?? "";
-  const extension = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
-  return AUDIO_EXTENSIONS.has(extension);
+  const type = (file.type || "").toLowerCase();
+  if (type.startsWith("audio/")) return true;
+  // Some browsers report video/* or an empty type for container formats that hold audio.
+  if (hasAudioExtension(file.name)) return true;
+  return false;
 }
 
 function fileKey(file) {
-  return [file.webkitRelativePath || file.name, file.size, file.lastModified].join(":");
+  const path = file.relativePath || file.webkitRelativePath || file.name;
+  return [path, file.size, file.lastModified].join(":");
 }
 
 function formatTime(seconds) {
@@ -64,16 +77,94 @@ function formatTime(seconds) {
   return `${minutes}:${remaining}`;
 }
 
-async function collectAudioFiles(directoryHandle, files) {
-  for await (const entry of directoryHandle.values()) {
-    if (entry.kind === "directory") {
-      await collectAudioFiles(entry, files);
-      continue;
-    }
-    if (entry.kind === "file" && AUDIO_EXTENSIONS.has(entry.name.slice(entry.name.lastIndexOf(".") + 1).toLowerCase())) {
-      files.push(await entry.getFile());
-    }
+const SKIPPED_DIRECTORIES = new Set([
+  "$recycle.bin",
+  "system volume information",
+  "windows",
+  "program files",
+  "program files (x86)",
+  "programdata",
+  "node_modules",
+  "appdata",
+  "$windows.~ws",
+  "$windows.~bt",
+  "recovery"
+]);
+
+const MAX_SCAN_DEPTH = 12;
+const MAX_SCAN_FILES = 5000;
+
+function shouldSkipDirectory(name = "") {
+  const lower = name.toLowerCase();
+  if (SKIPPED_DIRECTORIES.has(lower)) return true;
+  // Hidden/system folders never contain a user music library worth scanning.
+  return lower.startsWith(".") || lower.startsWith("$");
+}
+
+/**
+ * Walks a File System Access directory handle and collects every playable file.
+ * The walk never throws: an unreadable sub-folder is skipped so one bad folder
+ * cannot make an entire drive look empty.
+ */
+async function collectAudioFiles(directoryHandle, files, prefix = "", depth = 0, stats = { seen: 0 }) {
+  if (depth > MAX_SCAN_DEPTH || files.length >= MAX_SCAN_FILES) return stats;
+
+  // `values()` is the modern API; `entries()` covers older Chromium builds.
+  let iterator = null;
+  if (typeof directoryHandle.values === "function") {
+    iterator = directoryHandle.values();
+  } else if (typeof directoryHandle.entries === "function") {
+    iterator = directoryHandle.entries();
+  } else {
+    return stats;
   }
+
+  try {
+    for await (const item of iterator) {
+      // entries() yields [name, handle] pairs, values() yields handles.
+      const entry = Array.isArray(item) ? item[1] : item;
+      if (!entry) continue;
+      const name = entry.name ?? "";
+      const path = prefix ? `${prefix}/${name}` : name;
+
+      if (entry.kind === "directory") {
+        if (shouldSkipDirectory(name)) continue;
+        try {
+          await collectAudioFiles(entry, files, path, depth + 1, stats);
+        } catch {
+          // Permission denied or removable media unplugged - keep scanning.
+        }
+        if (files.length >= MAX_SCAN_FILES) break;
+        continue;
+      }
+
+      if (entry.kind !== "file") continue;
+      stats.seen += 1;
+      // Decide from the real File when the extension is missing/unknown, so files
+      // like "track" with an audio MIME type are still added.
+      const extension = fileExtension(name);
+      if (extension && !AUDIO_EXTENSIONS.has(extension)) continue;
+
+      try {
+        const file = await entry.getFile();
+        if (!isAudioFile(file)) continue;
+        // Directory handles give no webkitRelativePath, so carry the path ourselves.
+        try {
+          Object.defineProperty(file, "relativePath", { value: path, configurable: true });
+        } catch {
+          // Non-configurable File implementations: the name alone is enough.
+        }
+        files.push(file);
+        if (files.length >= MAX_SCAN_FILES) break;
+      } catch {
+        // Locked or in-use file - skip it.
+      }
+    }
+  } catch {
+    // Iteration itself failed (revoked permission): return what we already found.
+  }
+
+  return stats;
 }
 
 export function MusicProvider({ children }) {
@@ -173,10 +264,13 @@ export function MusicProvider({ children }) {
     tracksRef.current.forEach((track) => URL.revokeObjectURL(track.url));
   }, []);
 
-  const addFiles = useCallback((fileList, source = "Local library") => {
+  const addFiles = useCallback((fileList, source = "Local library", options = {}) => {
+    const { silentWhenEmpty = false } = options;
     const incoming = Array.from(fileList ?? []).filter(isAudioFile);
     if (incoming.length === 0) {
-      setScanError("No supported audio files were found. Try MP3, WAV, M4A, OGG or FLAC.");
+      if (!silentWhenEmpty) {
+        setScanError("No supported audio files were found. Try MP3, WAV, M4A, OGG or FLAC.");
+      }
       return 0;
     }
 
@@ -184,34 +278,97 @@ export function MusicProvider({ children }) {
     setLibraryName(source);
     setTracks((existing) => {
       const existingKeys = new Set(existing.map((track) => track.key));
-      const additions = incoming
-        .filter((file) => !existingKeys.has(fileKey(file)))
-        .map((file) => ({
-          key: fileKey(file),
+      const additions = [];
+      incoming.forEach((file) => {
+        const key = fileKey(file);
+        if (existingKeys.has(key)) return;
+        existingKeys.add(key);
+        additions.push({
+          key,
           name: file.name.replace(/\.[^/.]+$/, ""),
           fileName: file.name,
-          path: file.webkitRelativePath || file.name,
+          path: file.relativePath || file.webkitRelativePath || file.name,
           url: URL.createObjectURL(file)
-        }));
-      return [...existing, ...additions];
+        });
+      });
+      return additions.length > 0 ? [...existing, ...additions] : existing;
     });
     return incoming.length;
   }, []);
 
+  const openFolderInput = useCallback(() => {
+    const input = document.getElementById("ananta-music-folder-input");
+    if (input) {
+      input.click();
+      return true;
+    }
+    return false;
+  }, []);
+
   const scanFolder = useCallback(async () => {
     setScanError("");
-    if (!window.showDirectoryPicker) {
-      document.getElementById("ananta-music-folder-input")?.click();
+
+    // Directory picker needs a secure context; fall back to the webkitdirectory input.
+    const canUsePicker = typeof window !== "undefined"
+      && typeof window.showDirectoryPicker === "function"
+      && window.isSecureContext !== false;
+
+    if (!canUsePicker) {
+      if (!openFolderInput()) {
+        setScanError("This browser cannot open folders. Use “Add songs” to pick files instead.");
+      }
       return;
     }
 
+    let directory = null;
+    try {
+      // `startIn: "music"` opens the OS music library (not the app/download
+      // folder) as a starting point. The dialog is a normal system file dialog,
+      // so any folder on any drive can still be navigated to and selected.
+      directory = await window.showDirectoryPicker({ mode: "read", startIn: "music" });
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      // Some builds reject unknown `startIn` values - retry without it.
+      try {
+        directory = await window.showDirectoryPicker({ mode: "read" });
+      } catch (retryError) {
+        if (retryError?.name === "AbortError") return;
+        if (!openFolderInput()) {
+          setScanError("The folder picker was blocked by the browser. Use “Add songs” instead.");
+        }
+        return;
+      }
+    }
+
+    if (!directory) return;
+
     setIsScanning(true);
     try {
-      const directory = await window.showDirectoryPicker({ mode: "read" });
+      // Explicitly request read permission; without it the walk yields nothing.
+      if (typeof directory.queryPermission === "function") {
+        let permission = await directory.queryPermission({ mode: "read" });
+        if (permission === "prompt" && typeof directory.requestPermission === "function") {
+          permission = await directory.requestPermission({ mode: "read" });
+        }
+        if (permission === "denied") {
+          setScanError(`Read access to “${directory.name}” was denied. Allow access and scan again.`);
+          return;
+        }
+      }
+
       const files = [];
-      await collectAudioFiles(directory, files);
-      const added = addFiles(files, directory.name);
-      if (added === 0) setScanError(`No audio files found inside ${directory.name}.`);
+      const stats = await collectAudioFiles(directory, files);
+      const added = addFiles(files, directory.name, { silentWhenEmpty: true });
+
+      if (added === 0) {
+        setScanError(
+          stats.seen > 0
+            ? `Scanned ${stats.seen} file${stats.seen === 1 ? "" : "s"} in “${directory.name}” but found no MP3/WAV/M4A/OGG/FLAC audio. Pick the folder that directly contains your music, or use “Add songs”.`
+            : `“${directory.name}” looks empty or could not be read. Pick the music folder itself, or use “Add songs”.`
+        );
+      } else if (files.length >= MAX_SCAN_FILES) {
+        setScanError(`Loaded the first ${MAX_SCAN_FILES} songs from “${directory.name}”. Scan a smaller folder for the rest.`);
+      }
     } catch (error) {
       if (error?.name !== "AbortError") {
         setScanError("The folder could not be scanned. Check the browser permission and try again.");
@@ -219,7 +376,7 @@ export function MusicProvider({ children }) {
     } finally {
       setIsScanning(false);
     }
-  }, [addFiles]);
+  }, [addFiles, openFolderInput]);
 
   const removeTrack = useCallback((key) => {
     const track = tracks.find((item) => item.key === key);
@@ -372,6 +529,17 @@ export function MusicPlayer() {
   const current = music.currentTrack;
   const progressMax = music.duration > 0 ? music.duration : 1;
 
+  // React strips unknown casings, so the directory attributes are set imperatively.
+  // They must stay paired with no `accept` filter: Chrome drops whole directory
+  // listings when `accept` and `webkitdirectory` are combined.
+  useEffect(() => {
+    const input = folderInputRef.current;
+    if (!input) return;
+    input.setAttribute("webkitdirectory", "");
+    input.setAttribute("directory", "");
+    input.setAttribute("mozdirectory", "");
+  }, []);
+
   return (
     <>
       <input
@@ -379,13 +547,13 @@ export function MusicPlayer() {
         ref={folderInputRef}
         type="file"
         multiple
-        accept="audio/*,.aif,.aiff,.flac,.m4a,.mka,.mp3,.mp4,.ogg,.opus,.wav,.webm"
-        webkitdirectory="true"
         className="hidden"
         onChange={(event) => {
-          const files = event.target.files;
-          if (files?.length) music.addFiles(files, files[0].webkitRelativePath?.split("/")[0] || "Selected folder");
+          const files = Array.from(event.target.files ?? []);
           event.target.value = "";
+          if (files.length === 0) return;
+          const folderName = files[0].webkitRelativePath?.split("/")[0] || "Selected folder";
+          music.addFiles(files, folderName);
         }} />
       <input
         ref={fileInputRef}
@@ -501,7 +669,7 @@ export function MusicPlayer() {
               <Upload size={15} /> Add songs
             </button>
           </div>
-          <p className="music-help">To scan a whole drive, choose its root folder when the browser picker opens. Silent drive scanning is blocked by browser security.</p>
+          <p className="music-help">Opens your system file dialog — pick any folder on any drive (C:, D:, external disks). All sub-folders are scanned. Browsers cannot read a drive without you choosing it first.</p>
 
           {music.tracks.length > 0 && (
             <div className="music-library-list">

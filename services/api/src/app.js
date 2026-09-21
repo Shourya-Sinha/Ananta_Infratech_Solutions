@@ -31,6 +31,7 @@ var _supplier = require("./modules/suppliers/supplier.routes");
 var _material = require("./modules/materials/material.routes");
 var _equipment = require("./modules/equipment/equipment.routes");
 var _diary = require("./modules/diary/diary.routes");
+var _media = require("./modules/media/media.routes");
 var _openapi = require("./config/openapi");
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function createApp() {
@@ -84,6 +85,7 @@ function createApp() {
   app.use("/api/v1/materials", _material.materialRouter);
   app.use("/api/v1/equipment", _equipment.equipmentRouter);
   app.use("/api/v1/site-diary", _diary.diaryRouter);
+  app.use("/api/v1/media", _media.mediaRouter);
   // Every module from the architecture doc (§33 API design) is now mounted.
 
   app.use(_errorHandler.notFoundHandler);
