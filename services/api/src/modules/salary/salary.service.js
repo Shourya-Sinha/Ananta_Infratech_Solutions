@@ -205,7 +205,10 @@ exports.SalaryService = {
     return _SalaryLedger.SalaryLedger.create({
       worker: workerObjectId,
       site: params.siteId,
-      date: new Date(),
+      // A direct advance/Kharchi can be entered for a specific calendar day.
+      // Preserve that day in the ledger so monthly/site finance filters do not
+      // silently move the expense to the admin's request time.
+      date: params.date ? new Date(params.date) : new Date(),
       type: params.type,
       description: params.description,
       creditPaise: "0",

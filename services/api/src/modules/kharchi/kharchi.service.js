@@ -76,6 +76,7 @@ exports.KharchiService = {
       siteId,
       type: "KHARCHI_DEDUCTION",
       amountPaise: request.amountPaise,
+      date: request.date,
       description: `Kharchi (added by Super Admin) — ${request.category} — ${request.reason}`,
       reference: request._id.toString(),
       actorId: input.actorId
@@ -120,6 +121,7 @@ exports.KharchiService = {
       siteId: request.site.toString(),
       type: "KHARCHI_DEDUCTION",
       amountPaise: request.amountPaise,
+      date: request.date,
       description: `Kharchi — ${request.category} — ${request.reason}`,
       reference: request._id.toString(),
       actorId: approvedBy

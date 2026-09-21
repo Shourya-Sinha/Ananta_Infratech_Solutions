@@ -24,7 +24,13 @@ function useSitesForSelect() {
 function useSiteWorkers(site) {
   return useQuery({
     queryKey: ["workers", { site }],
-    queryFn: async () => unwrap(api.get(`/workers?site=${site}&pageSize=100`)),
+    queryFn: async () => {
+      const result = await unwrap(api.get(`/workers?site=${site}&pageSize=100`));
+      // The admin worker endpoint is paginated for SUPER_ADMIN users. Keep
+      // this hook array-shaped because the attendance screen needs to filter
+      // and map the returned workers after a site is selected.
+      return Array.isArray(result) ? result : Array.isArray(result?.items) ? result.items : [];
+    },
     enabled: Boolean(site)
   });
 }

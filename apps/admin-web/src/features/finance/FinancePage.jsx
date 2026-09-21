@@ -102,6 +102,11 @@ export function FinancePage() {
   useSocketInvalidate("site:investment_reversed", [["finance"]]);
   useSocketInvalidate("site:capital_updated", [["finance"]]);
   useSocketInvalidate("site:profit_updated", [["finance"]]);
+  // Advances/Kharchi post site-linked salary-ledger debits. Refresh every
+  // finance query when those entries settle so P/L, gross totals and the
+  // Expenses feed stay in sync with payroll.
+  useSocketInvalidate("advance:paid", [["finance"]]);
+  useSocketInvalidate("kharchi:approved", [["finance"]]);
   useSocketInvalidate("company:expense_added", [["finance"]]);
   useSocketInvalidate("company:expense_reversed", [["finance"]]);
 
@@ -197,7 +202,9 @@ export function FinancePage() {
     { header: "Amount", cell: (t) => formatINR(Math.round(t.amountPaise / 100)) },
     { header: "Description", cell: (t) => (t.reversalOf ? "Reversal entry" : t.description ?? "—"), className: "font-body" },
     {
-      header: "", cell: (t) => t.reversalOf || reversedTransactionIds.has(String(t._id)) ? (
+      header: "", cell: (t) => t.isWorkerPayout ? (
+        <span className="text-xs uppercase tracking-wide text-graphite-300">salary ledger</span>
+      ) : t.reversalOf || reversedTransactionIds.has(String(t._id)) ? (
         <span className="text-xs uppercase tracking-wide text-graphite-300">reversed</span>
       ) : (
         <button className="text-xs font-medium text-rust hover:underline"
@@ -272,7 +279,7 @@ export function FinancePage() {
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <KpiCard label="Total investment" value={formatINR(totals.totalInvestment)} sublabel="Added by admin" />
             <KpiCard label="Total income" value={formatINR(totals.totalIncome)} tone="positive" />
-            <KpiCard label="Total expenses" value={formatINR(totals.totalExpenses)} sublabel={`Incl. labour ${formatINR(totals.totalLabourCost)}`} tone="negative" />
+            <KpiCard label="Total expenses" value={formatINR(totals.totalExpenses)} sublabel={`Labour ${formatINR(totals.totalLabourCost)} · worker payouts ${formatINR(totals.totalWorkerPayouts ?? 0)}`} tone="negative" />
             <KpiCard label="Gross profit / loss" value={formatINR(totals.grossProfitLoss)} sublabel={`Profit ${formatINR(totals.grossProfit)} · Loss ${formatINR(totals.grossLoss)}`} tone={totals.grossProfitLoss >= 0 ? "positive" : "negative"} />
           </div>
           <p className="text-xs text-graphite-500">
@@ -350,6 +357,7 @@ export function FinancePage() {
             <KpiCard label="Capital invested" value={formatINR(profitLoss.capitalInvested ?? 0)} />
             <KpiCard label="Income" value={formatINR(profitLoss.income)} tone="positive" />
             <KpiCard label="Labour cost" value={formatINR(profitLoss.labourCost)} tone="negative" />
+            <KpiCard label="Worker payouts" value={formatINR(profitLoss.workerPayouts ?? 0)} sublabel="Paid advances + Kharchi" tone="negative" />
             <KpiCard label="Material & other expenses" value={formatINR(profitLoss.materialAndOtherExpenses)} tone="negative" />
             <KpiCard label="Total expenses" value={formatINR(profitLoss.totalExpenses)} tone="negative" />
             <KpiCard label="Profit / Loss" value={formatINR(profitLoss.profitLoss)} sublabel={`Net position: ${formatINR(profitLoss.netPosition)}`} tone={profitLoss.profitLoss >= 0 ? "positive" : "negative"} />
@@ -423,7 +431,7 @@ export function FinancePage() {
             <KpiCard label="Kharchi paid out" value={formatINR(cashFlow.kharchiPaid)} tone="negative" />
             <KpiCard label="Total cash to workers" value={formatINR(cashFlow.totalPayoutToWorkers)} tone="negative" />
           </div>
-          <p className="text-xs text-graphite-500">These are actual cash payouts (advances & kharchi paid out on site) — separate from accrued labour cost in the P/L view. When salaries are paid at month end, settled amounts are reduced by these already-paid advances.</p>
+          <p className="text-xs text-graphite-500">These are actual cash payouts (advances & Kharchi paid out on site). They are included in the site and gross expense totals, while remaining visible here as a cash-flow breakdown. When salaries are paid at month end, settled amounts are reduced by these already-paid advances.</p>
           <DataTable columns={payoutColumns} rows={cashFlow.payouts} emptyTitle="No worker payouts recorded" emptyBody="When you mark advances PAID or approve kharchi, they appear here as cash outflows." />
         </div>
       )}
