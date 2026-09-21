@@ -19,16 +19,39 @@ function useSites(status) {
   });
 }
 
+// function useCreateSite() {
+//   const qc = useQueryClient();
+//   const toast = useToast();
+//   return useMutation({
+//     mutationFn: async (input) => unwrap(api.post("/sites", input)),
+//     onSuccess: (_data, input) => {
+//       qc.invalidateQueries({ queryKey: ["sites"] });
+//       toast.success(`Site “${input.name}” created with status PLANNING.`);
+//     },
+//     onError: (err) => toast.error(err instanceof Error ? err.message : "Could not create the site."),
+//   });
+// }
+
 function useCreateSite() {
   const qc = useQueryClient();
   const toast = useToast();
+
   return useMutation({
     mutationFn: async (input) => unwrap(api.post("/sites", input)),
+
     onSuccess: (_data, input) => {
       qc.invalidateQueries({ queryKey: ["sites"] });
       toast.success(`Site “${input.name}” created with status PLANNING.`);
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not create the site."),
+
+    onError: (err) => {
+      const message =
+        err?.response?.data?.errors?.fieldErrors?.address?.[0] ||
+        err?.response?.data?.message ||
+        (err instanceof Error ? err.message : "Could not create the site.");
+
+      toast.error(message);
+    },
   });
 }
 
