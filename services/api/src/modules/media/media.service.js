@@ -110,7 +110,9 @@ function normaliseScraped(renderer) {
 }
 
 async function searchViaScrape(query, limit) {
-  const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAQ%253D%253D&hl=en`;
+  // sp=EgIQAQ%3D%3D is the "Videos" filter (URL-encoded once — a double-encoded
+  // %253D silently disables the filter and mixes channels/playlists in).
+  const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAQ%3D%3D&hl=en`;
   const html = await fetchText(url);
   const data = extractInitialData(html);
   if (!data) throw new Error("Could not parse YouTube response");
@@ -184,6 +186,11 @@ exports.MediaService = {
         }
         lastError = null;
       } catch (error) {
+        // Surface why a path failed (e.g. an invalid or quota-exhausted
+        // YOUTUBE_API_KEY) without breaking the scrape fallback.
+        if (process.env.NODE_ENV !== "test") {
+          console.warn(`[media] YouTube search path failed: ${error?.message || error}`);
+        }
         lastError = error;
       }
     }

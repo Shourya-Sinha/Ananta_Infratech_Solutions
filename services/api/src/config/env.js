@@ -10,6 +10,13 @@ dotenv.config({
   path: path.resolve(__dirname, "../../../../.env"),
 });
 
+// Also load services/api/.env when present. dotenv never overrides variables
+// that are already set, so repo-root values win and this file only fills gaps
+// (e.g. YOUTUBE_API_KEY placed next to the service instead of at the root).
+dotenv.config({
+  path: path.resolve(__dirname, "../../../.env"),
+});
+
 // Fail fast at boot if required env vars are missing/malformed.
 const envSchema = z.object({
   NODE_ENV: z
