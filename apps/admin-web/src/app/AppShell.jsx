@@ -30,7 +30,7 @@ import { useLogout } from "@/features/auth/api";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 import { ToastProvider } from "@/components/ui/Toast";
 import { MusicPlayer, MusicProvider } from "@/features/music/MusicPlayer";
-import { FloatingVideo, VideoProvider, VideoSearchToggle } from "@/features/video/VideoPlayer";
+import { VideoProvider, VideoSearchToggle } from "@/features/video/VideoPlayer";
 import { cx } from "@/lib/format";
 
 const NAV_GROUPS = [
@@ -200,9 +200,6 @@ export function AppShell() {
                 </div>
               </main>
             </div>
-
-            {/* Mounted above the router so playback survives page navigation. */}
-            <FloatingVideo />
           </div>
         </ToastProvider>
       </VideoProvider>
