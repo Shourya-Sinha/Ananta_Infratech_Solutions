@@ -1,13 +1,18 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
   Loader2,
   Maximize2,
   Minimize2,
   Move,
+  Pause,
+  Play,
   Search,
+  SkipForward,
   Youtube,
   X
 } from "lucide-react";
+import YouTube from "react-youtube";
 import { api } from "@/lib/apiClient";
 import { cx } from "@/lib/format";
 
@@ -334,14 +339,114 @@ export function VideoSearchToggle() {
   );
 }
 
+/** Human-readable reasons for the YouTube IFrame API error codes. */
+const YT_ERROR_MESSAGES = {
+  2: "This video link is invalid.",
+  5: "The HTML5 player could not load this video.",
+  100: "This video was removed or set to private.",
+  101: "The uploader disabled embedding for this video.",
+  150: "The uploader disabled embedding for this video."
+};
+
 /**
- * The floating, draggable iframe. Rendered once at the AppShell level and never
- * remounted on navigation, so the video keeps playing across route changes.
+ * The floating, draggable YouTube window. Rendered once at the AppShell level
+ * and never remounted on navigation, so playback continues across routes.
+ *
+ * Playback runs through the YouTube IFrame Player API (react-youtube) inside
+ * this window — never a redirect to youtube.com. If a video refuses to embed
+ * (errors 101/150 are common) the player automatically advances to the next
+ * search result, and if the IFrame API script itself is blocked the window
+ * falls back to a plain embed iframe. Every layer stays inside this window.
  */
 export function FloatingVideo() {
   const video = useVideo();
   const dragRef = useRef(null);
+  const playerRef = useRef(null);
+  const readyRef = useRef(false);
+  const failedIdsRef = useRef(new Set());
   const [isDragging, setIsDragging] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
+  const [playerState, setPlayerState] = useState(-1);
+  const [playbackError, setPlaybackError] = useState(null);
+  const [directEmbed, setDirectEmbed] = useState(false);
+
+  const currentId = video.current?.videoId ?? null;
+  const isPlaying = playerState === 1 || playerState === 3;
+
+  // Plays the next result that has not already errored. `markCurrent` flags the
+  // failed video so auto-skip never loops, while a manual skip leaves it retryable.
+  const goNext = useCallback(
+    (markCurrent) => {
+      const failedId = video.current?.videoId;
+      if (!failedId) return false;
+      if (markCurrent) failedIdsRef.current.add(failedId);
+
+      const pool = video.results.length > 0 ? video.results : video.recent;
+      const position = pool.findIndex((item) => item.videoId === failedId);
+      const ordered = position >= 0 ? [...pool.slice(position + 1), ...pool.slice(0, position)] : pool;
+      const next = ordered.find((item) => item.videoId !== failedId && !failedIdsRef.current.has(item.videoId));
+      if (!next) return false;
+      video.playVideo(next);
+      return true;
+    },
+    [video]
+  );
+
+  // Reset player state for every new video and arm a watchdog: if the IFrame
+  // API script never initialises (blocked by an extension or the network),
+  // fall back to a plain embed iframe instead of showing a dead window.
+  useEffect(() => {
+    if (!currentId) return undefined;
+    readyRef.current = false;
+    setPlayerReady(false);
+    setPlayerState(-1);
+    setPlaybackError(null);
+    const timer = setTimeout(() => {
+      if (!readyRef.current) setDirectEmbed(true);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [currentId]);
+
+  // A fresh search clears the failed-video memory so old errors never block new results.
+  useEffect(() => {
+    failedIdsRef.current.clear();
+  }, [video.results]);
+
+  const onPlayerReady = useCallback((event) => {
+    readyRef.current = true;
+    playerRef.current = event.target;
+    setPlayerReady(true);
+  }, []);
+
+  const onPlayerStateChange = useCallback(
+    (event) => {
+      const state = Number(event.data);
+      setPlayerState(state);
+      // Video finished: behave like a queue and continue with the next result.
+      if (state === 0 && currentId) goNext(false);
+    },
+    [currentId, goNext]
+  );
+
+  const onPlayerError = useCallback(
+    (event) => {
+      const code = Number(event?.data);
+      const reason = YT_ERROR_MESSAGES[code] || "YouTube could not play this video.";
+      if (goNext(true)) {
+        setPlaybackError({ message: `${reason} Trying the next video…` });
+      } else {
+        setPlaybackError({ message: `${reason} Try another video from the list.`, exhausted: true });
+      }
+    },
+    [goNext]
+  );
+
+  const togglePlayback = useCallback(() => {
+    const player = playerRef.current;
+    if (!player?.getPlayerState) return;
+    if (player.getPlayerState() === 1 || player.getPlayerState() === 3) player.pauseVideo();
+    else player.playVideo();
+  }, []);
 
   const onPointerDown = useCallback((event) => {
     if (event.button !== 0 && event.pointerType === "mouse") return;
@@ -369,12 +474,14 @@ export function FloatingVideo() {
     event?.currentTarget?.releasePointerCapture?.(event.pointerId);
   }, []);
 
-  if (!video.current) return null;
+  if (!video.current || !currentId) return null;
 
   const { width, height } = video.size;
-  // `enablejsapi` keeps the embed controllable; `origin` satisfies YouTube's
-  // embed referrer check when the app is served from a proxy host.
-  const src = `https://www.youtube-nocookie.com/embed/${video.current.videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+  // Last-resort embed when the IFrame API never came up. Still inside this window.
+  const embedSrc = `https://www.youtube-nocookie.com/embed/${currentId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+  const hasDirectControls = playerReady && !directEmbed && !playbackError;
+  const showLoadingOverlay = !playerReady && !directEmbed && !playbackError;
+  const showTapToPlay = hasDirectControls && (playerState === -1 || playerState === 5);
 
   return (
     <div
@@ -391,6 +498,17 @@ export function FloatingVideo() {
         <Move size={13} className="shrink-0 text-white/55" />
         <p className="floating-video-title">{video.current.title}</p>
         <div className="ml-auto flex shrink-0 items-center gap-1">
+          {hasDirectControls && (
+            <button
+              type="button"
+              className="floating-video-button"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={togglePlayback}
+              aria-label={isPlaying ? "Pause video" : "Play video"}
+              title={isPlaying ? "Pause video" : "Play video"}>
+              {isPlaying ? <Pause size={13} /> : <Play size={13} />}
+            </button>
+          )}
           <button
             type="button"
             className="floating-video-button"
@@ -411,17 +529,81 @@ export function FloatingVideo() {
           </button>
         </div>
       </div>
-      <iframe
-        key={video.current.videoId}
-        title={video.current.title || "YouTube video"}
-        src={src}
-        width={width}
-        height={height}
-        style={{ height, pointerEvents: isDragging ? "none" : "auto" }}
-        frameBorder="0"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        referrerPolicy="strict-origin-when-cross-origin"
-        allowFullScreen />
+
+      <div className="floating-video-frame" style={{ height }}>
+        {!directEmbed && (
+          <YouTube
+            videoId={currentId}
+            opts={YOUTUBE_OPTS}
+            onReady={onPlayerReady}
+            onStateChange={onPlayerStateChange}
+            onError={onPlayerError}
+            className="floating-video-player"
+            iframeClassName="floating-video-iframe" />
+        )}
+
+        {directEmbed && (
+          <iframe
+            key={currentId}
+            title={video.current.title || "YouTube video"}
+            src={embedSrc}
+            style={{ height, pointerEvents: isDragging ? "none" : "auto" }}
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen />
+        )}
+
+        {showLoadingOverlay && (
+          <div className="floating-video-overlay" aria-live="polite">
+            <Loader2 size={22} className="animate-spin" />
+            <p className="floating-video-overlay-text">Loading player…</p>
+          </div>
+        )}
+
+        {showTapToPlay && (
+          <div className="floating-video-overlay">
+            <button
+              type="button"
+              className="floating-video-play-big"
+              onClick={() => playerRef.current?.playVideo?.()}
+              aria-label="Play video"
+              title="Play video">
+              <Play size={22} fill="currentColor" />
+            </button>
+            <p className="floating-video-overlay-text">Tap to start playback</p>
+          </div>
+        )}
+
+        {playbackError && (
+          <div className="floating-video-overlay" role="alert">
+            <AlertTriangle size={20} className="text-amber-300" />
+            <p className="floating-video-overlay-text">{playbackError.message}</p>
+            {!playbackError.exhausted && (
+              <button type="button" className="floating-video-retry" onClick={() => goNext(true)}>
+                <SkipForward size={13} /> Play next
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+// Kept in a module-level constant: react-youtube recreates the player whenever
+// the `opts` identity changes, and none of these values are dynamic. `origin`
+// is required for the IFrame API postMessage bridge when the app is served
+// from a proxied host, so it is pinned to the live window origin once.
+const APP_ORIGIN = typeof window !== "undefined" ? window.location.origin : undefined;
+const YOUTUBE_OPTS = {
+  width: "100%",
+  height: "100%",
+  playerVars: {
+    autoplay: 1,
+    rel: 0,
+    modestbranding: 1,
+    playsinline: 1,
+    ...(APP_ORIGIN ? { origin: APP_ORIGIN } : {})
+  }
+};

@@ -167,6 +167,69 @@ async function collectAudioFiles(directoryHandle, files, prefix = "", depth = 0,
   return stats;
 }
 
+/**
+ * Drag-and-drop folders surface as FileSystemEntry objects rather than Files.
+ * `readEntries` returns them in ~100-item batches, so keep calling until it
+ * returns an empty batch or the directory has been fully read.
+ */
+function readAllEntryBatches(entry) {
+  return new Promise((resolve) => {
+    const reader = entry.createReader();
+    const all = [];
+    const readNextBatch = () => {
+      reader.readEntries(
+        (batch) => {
+          if (!Array.isArray(batch) || batch.length === 0) {
+            resolve(all);
+            return;
+          }
+          all.push(...batch);
+          readNextBatch();
+        },
+        () => resolve(all) // Unreadable folder: keep whatever was listed.
+      );
+    };
+    readNextBatch();
+  });
+}
+
+/** Same contract as collectAudioFiles, but for a dropped FileSystemEntry tree. */
+async function collectAudioFromEntry(entry, files, prefix = "", depth = 0, stats = { seen: 0 }) {
+  if (!entry || depth > MAX_SCAN_DEPTH || files.length >= MAX_SCAN_FILES) return stats;
+
+  if (entry.isFile) {
+    stats.seen += 1;
+    const extension = fileExtension(entry.name ?? "");
+    if (extension && !AUDIO_EXTENSIONS.has(extension)) return stats;
+    try {
+      const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+      if (!isAudioFile(file)) return stats;
+      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+      try {
+        Object.defineProperty(file, "relativePath", { value: path, configurable: true });
+      } catch {
+        // Non-configurable File implementations: the name alone is enough.
+      }
+      files.push(file);
+    } catch {
+      // Locked or unreadable file - skip it.
+    }
+    return stats;
+  }
+
+  if (entry.isDirectory) {
+    if (shouldSkipDirectory(entry.name ?? "")) return stats;
+    const children = await readAllEntryBatches(entry);
+    const nextPrefix = prefix ? `${prefix}/${entry.name}` : entry.name;
+    for (const child of children) {
+      await collectAudioFromEntry(child, files, nextPrefix, depth + 1, stats);
+      if (files.length >= MAX_SCAN_FILES) break;
+    }
+  }
+
+  return stats;
+}
+
 export function MusicProvider({ children }) {
   const audioRef = useRef(null);
   const tracksRef = useRef([]);
@@ -181,6 +244,7 @@ export function MusicProvider({ children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState("");
+  const [scanStatus, setScanStatus] = useState("");
 
   useEffect(() => {
     tracksRef.current = tracks;
@@ -305,10 +369,85 @@ export function MusicProvider({ children }) {
     return false;
   }, []);
 
+  // The classic <input webkitdirectory> picker is supported by every modern
+  // browser (Chrome, Edge, Firefox, Safari) and also works inside embedded
+  // frames, where showDirectoryPicker is blocked with a SecurityError. It
+  // returns the whole folder tree (all sub-folders) in one change event.
+  const supportsFolderInput = useCallback(() => {
+    try {
+      return typeof document !== "undefined" && "webkitdirectory" in document.createElement("input");
+    } catch {
+      return false;
+    }
+  }, []);
+
+  /** Shared reporting for every folder source (picker, drop, fallback walk). */
+  const reportFolderResult = useCallback((added, total, folderName) => {
+    if (added > 0) {
+      setScanError("");
+      let status = `Added ${added} song${added === 1 ? "" : "s"} from “${folderName}”.`;
+      if (total >= MAX_SCAN_FILES) status += ` First ${MAX_SCAN_FILES} songs loaded — scan smaller sub-folders for the rest.`;
+      setScanStatus(status);
+    } else {
+      setScanStatus("");
+      setScanError(
+        total > 0
+          ? `Scanned ${total} file${total === 1 ? "" : "s"} in “${folderName}” but found no MP3/WAV/M4A/OGG/FLAC audio. Pick the folder that directly contains your music, or use “Add songs”.`
+          : `“${folderName}” looks empty or could not be read. Pick the music folder itself, or use “Add songs”.`
+      );
+    }
+  }, []);
+
+  /** Called by the hidden webkitdirectory input after a folder is picked. */
+  const handleFolderFiles = useCallback(
+    (fileList) => {
+      const files = Array.from(fileList ?? []);
+      if (files.length === 0) return; // Dialog was cancelled.
+      const folderName = files[0].webkitRelativePath?.split("/")[0] || "Selected folder";
+      setIsScanning(true);
+      try {
+        const added = addFiles(files, folderName, { silentWhenEmpty: true });
+        reportFolderResult(added, files.length, folderName);
+      } finally {
+        setIsScanning(false);
+      }
+    },
+    [addFiles, reportFolderResult]
+  );
+
+  /** Drag-and-drop of a folder: walk the dropped entry tree for audio. */
+  const scanDroppedEntries = useCallback(
+    async (entries) => {
+      if (!entries || entries.length === 0) return;
+      setIsScanning(true);
+      setScanError("");
+      setScanStatus("");
+      try {
+        const files = [];
+        let stats = { seen: 0 };
+        for (const entry of entries) {
+          stats = await collectAudioFromEntry(entry, files, "", 0, stats);
+        }
+        const folderName = entries[0]?.name || "Dropped folder";
+        const added = addFiles(files, folderName, { silentWhenEmpty: true });
+        reportFolderResult(added, Math.max(stats.seen, files.length), folderName);
+      } catch {
+        setScanError("The dropped folder could not be read. Try “Scan folder / drive” instead.");
+      } finally {
+        setIsScanning(false);
+      }
+    },
+    [addFiles, reportFolderResult]
+  );
+
   const scanFolder = useCallback(async () => {
     setScanError("");
+    setScanStatus("");
 
-    // Directory picker needs a secure context; fall back to the webkitdirectory input.
+    // 1st choice: the webkitdirectory input — universal and iframe-safe.
+    if (supportsFolderInput() && openFolderInput()) return;
+
+    // Fallback: File System Access API walk (older Chromium without the input).
     const canUsePicker = typeof window !== "undefined"
       && typeof window.showDirectoryPicker === "function"
       && window.isSecureContext !== false;
@@ -359,16 +498,7 @@ export function MusicProvider({ children }) {
       const files = [];
       const stats = await collectAudioFiles(directory, files);
       const added = addFiles(files, directory.name, { silentWhenEmpty: true });
-
-      if (added === 0) {
-        setScanError(
-          stats.seen > 0
-            ? `Scanned ${stats.seen} file${stats.seen === 1 ? "" : "s"} in “${directory.name}” but found no MP3/WAV/M4A/OGG/FLAC audio. Pick the folder that directly contains your music, or use “Add songs”.`
-            : `“${directory.name}” looks empty or could not be read. Pick the music folder itself, or use “Add songs”.`
-        );
-      } else if (files.length >= MAX_SCAN_FILES) {
-        setScanError(`Loaded the first ${MAX_SCAN_FILES} songs from “${directory.name}”. Scan a smaller folder for the rest.`);
-      }
+      reportFolderResult(added, stats.seen, directory.name);
     } catch (error) {
       if (error?.name !== "AbortError") {
         setScanError("The folder could not be scanned. Check the browser permission and try again.");
@@ -376,7 +506,7 @@ export function MusicProvider({ children }) {
     } finally {
       setIsScanning(false);
     }
-  }, [addFiles, openFolderInput]);
+  }, [addFiles, openFolderInput, reportFolderResult, supportsFolderInput]);
 
   const removeTrack = useCallback((key) => {
     const track = tracks.find((item) => item.key === key);
@@ -464,8 +594,11 @@ export function MusicProvider({ children }) {
     isOpen,
     isScanning,
     scanError,
+    scanStatus,
     setIsOpen,
     addFiles,
+    handleFolderFiles,
+    scanDroppedEntries,
     scanFolder,
     removeTrack,
     clearLibrary,
@@ -482,6 +615,7 @@ export function MusicProvider({ children }) {
     currentIndex,
     currentTime,
     duration,
+    handleFolderFiles,
     isOpen,
     isPlaying,
     isScanning,
@@ -490,8 +624,10 @@ export function MusicProvider({ children }) {
     playTrack,
     previousTrack,
     removeTrack,
+    scanDroppedEntries,
     scanError,
     scanFolder,
+    scanStatus,
     seek,
     setVolume,
     togglePlay,
@@ -549,11 +685,10 @@ export function MusicPlayer() {
         multiple
         className="hidden"
         onChange={(event) => {
-          const files = Array.from(event.target.files ?? []);
+          const files = event.target.files;
+          // Reset first so picking the same folder again still fires `change`.
           event.target.value = "";
-          if (files.length === 0) return;
-          const folderName = files[0].webkitRelativePath?.split("/")[0] || "Selected folder";
-          music.addFiles(files, folderName);
+          music.handleFolderFiles(files);
         }} />
       <input
         ref={fileInputRef}
@@ -597,6 +732,14 @@ export function MusicPlayer() {
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault();
+            // Dropped folders arrive as entries, plain files as a FileList.
+            const entries = Array.from(event.dataTransfer.items ?? [])
+              .map((item) => (typeof item.webkitGetAsEntry === "function" ? item.webkitGetAsEntry() : null))
+              .filter(Boolean);
+            if (entries.some((entry) => entry.isDirectory)) {
+              music.scanDroppedEntries(entries);
+              return;
+            }
             music.addFiles(event.dataTransfer.files, "Dropped songs");
           }}>
           <div className="music-panel-header">
@@ -660,6 +803,7 @@ export function MusicPlayer() {
           )}
 
           {music.scanError && <p className="music-error">{music.scanError}</p>}
+          {!music.scanError && music.scanStatus && <p className="music-status">{music.scanStatus}</p>}
 
           <div className="music-actions">
             <button type="button" className="music-action-button" onClick={music.scanFolder} disabled={music.isScanning}>
@@ -669,7 +813,7 @@ export function MusicPlayer() {
               <Upload size={15} /> Add songs
             </button>
           </div>
-          <p className="music-help">Opens your system file dialog — pick any folder on any drive (C:, D:, external disks). All sub-folders are scanned. Browsers cannot read a drive without you choosing it first.</p>
+          <p className="music-help">Pick any folder on any drive (C:, D:, external disks) — every song inside it and its sub-folders is added at once. You can also drag a whole folder here.</p>
 
           {music.tracks.length > 0 && (
             <div className="music-library-list">
