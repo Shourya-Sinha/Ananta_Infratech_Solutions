@@ -11,6 +11,20 @@ var _sharedTypes = require("@ananta/shared-types");
 var _utils = require("@ananta/utils");
 var _mongoose = require("mongoose");
 var _financeMath = require("./financeMath");
+
+// Date-only filters represent calendar days. Using the end of the `to` day
+// prevents a monthly report from dropping every transaction after midnight on
+// its final day (which was especially visible for direct advance entries).
+function buildDateFilter(filter) {
+  if (!filter?.from && !filter?.to) return {};
+  const date = {};
+  if (filter.from) date.$gte = new Date(`${filter.from}T00:00:00.000Z`);
+  if (filter.to) date.$lte = new Date(`${filter.to}T23:59:59.999Z`);
+  return { date };
+}
+
+const PAYOUT_LEDGER_TYPES = ["ADVANCE_DEDUCTION", "KHARCHI_DEDUCTION"];
+
 exports.FinanceService = {
   /**
    * ADMIN INVESTMENT (new): the admin puts money/material/equipment INTO a
@@ -58,11 +72,8 @@ exports.FinanceService = {
   async listInvestments(filter) {
     const query = {};
     if (filter.site) query.site = filter.site;
-    if (filter.from || filter.to) {
-      query.date = {};
-      if (filter.from) query.date.$gte = new Date(filter.from);
-      if (filter.to) query.date.$lte = new Date(filter.to);
-    }
+    const dateFilter = buildDateFilter(filter);
+    if (dateFilter.date) query.date = dateFilter.date;
     return _Finance.SiteInvestment.find(query).sort({
       date: -1
     });
@@ -197,14 +208,37 @@ exports.FinanceService = {
     const query = {};
     if (filter.site) query.site = filter.site;
     if (filter.direction) query.direction = filter.direction;
-    if (filter.from || filter.to) {
-      query.date = {};
-      if (filter.from) query.date.$gte = new Date(filter.from);
-      if (filter.to) query.date.$lte = new Date(filter.to);
-    }
-    return _Finance.FinancialTransaction.find(query).sort({
+    const dateFilter = buildDateFilter(filter);
+    if (dateFilter.date) query.date = dateFilter.date;
+
+    const transactions = await _Finance.FinancialTransaction.find(query).sort({
       date: -1
     });
+    if (filter.direction !== "EXPENSE") return transactions;
+
+    // Paid advances and Kharchi are stored in the salary ledger because they
+    // also drive payroll deductions. Present them in the site's Expenses
+    // feed as well, otherwise the totals and the transaction list disagree.
+    const payoutQuery = {
+      type: { $in: PAYOUT_LEDGER_TYPES },
+      ...(filter.site ? { site: filter.site } : {}),
+      ...(dateFilter.date ? { date: dateFilter.date } : {})
+    };
+    const payouts = await _SalaryLedger.SalaryLedger.find(payoutQuery)
+      .populate("worker", "employeeId")
+      .sort({ date: -1 });
+    const payoutRows = payouts.map((payout) => ({
+      _id: payout._id,
+      date: payout.date,
+      category: payout.type === "ADVANCE_DEDUCTION" ? "ADVANCE" : "KHARCHI",
+      amountPaise: Number(payout.debitPaise?.toString?.() ?? payout.debitPaise ?? 0),
+      description: payout.description,
+      worker: payout.worker,
+      site: payout.site,
+      isWorkerPayout: true,
+      reversalOf: null
+    }));
+    return [...transactions, ...payoutRows].sort((a, b) => new Date(b.date) - new Date(a.date));
   },
   async getSiteCapitalTotal(siteId) {
     const rows = await _Finance.SiteCapital.aggregate([{
@@ -251,7 +285,8 @@ exports.FinanceService = {
   /**
    * Site profit/loss (§17 of spec): income - expenses, plus labour cost
    * pulled from the salary ledger (credits = wages earned on this site),
-   * admin INVESTMENTS (new), and a net project position.
+   * paid worker payouts (advance/Kharchi debits), admin INVESTMENTS (new),
+   * and a net project position.
    */
   /**
    * Build the date filter $match for a SalaryLedger aggregation. Note:
@@ -275,16 +310,12 @@ exports.FinanceService = {
     if (!site) throw _AppError.AppError.notFound("Site not found");
     const mongoose = _mongoose;
     const siteObjectId = new mongoose.Types.ObjectId(siteId);
-    const dateFilter = {};
-    if (filter?.from || filter?.to) {
-      dateFilter.date = {};
-      if (filter.from) dateFilter.date.$gte = new Date(filter.from);
-      if (filter.to) dateFilter.date.$lte = new Date(filter.to);
-    }
-    const [incomeAgg, expenseAgg, labourAgg, investmentAgg, investmentCount, capitalTotal] = await Promise.all([_Finance.FinancialTransaction.aggregate([{
+    const dateFilter = buildDateFilter(filter);
+    const [incomeAgg, expenseAgg, labourAgg, payoutAgg, investmentAgg, investmentCount, capitalTotal] = await Promise.all([_Finance.FinancialTransaction.aggregate([{
       $match: {
         site: siteObjectId,
-        direction: "INCOME"
+        direction: "INCOME",
+        ...dateFilter
       }
     }, {
       $group: {
@@ -296,7 +327,8 @@ exports.FinanceService = {
     }]), _Finance.FinancialTransaction.aggregate([{
       $match: {
         site: siteObjectId,
-        direction: "EXPENSE"
+        direction: "EXPENSE",
+        ...dateFilter
       }
     }, {
       $group: {
@@ -320,9 +352,25 @@ exports.FinanceService = {
           }
         }
       }
+    }]), _SalaryLedger.SalaryLedger.aggregate([{
+      $match: {
+        site: siteObjectId,
+        type: { $in: PAYOUT_LEDGER_TYPES },
+        ...(dateFilter.date ? { date: dateFilter.date } : {})
+      }
+    }, {
+      $group: {
+        _id: null,
+        total: {
+          $sum: {
+            $toDouble: "$debitPaise"
+          }
+        }
+      }
     }]), _Finance.SiteInvestment.aggregate([{
       $match: {
-        site: siteObjectId
+        site: siteObjectId,
+        ...dateFilter
       }
     }, {
       $group: {
@@ -343,15 +391,17 @@ exports.FinanceService = {
     }), this.getSiteCapitalTotal(siteId)]);
     const incomePaise = incomeAgg[0]?.total ?? 0;
     const materialAndOtherExpensePaise = expenseAgg[0]?.total ?? 0;
-    const labourCostPaise = Math.round(labourAgg[0]?.total ?? 0);
-    const investmentPaise = Math.round(investmentAgg[0]?.total ?? 0);
+    const labourCostPaise = Math.round(labourAgg?.[0]?.total ?? 0);
+    const workerPayoutPaise = Math.round(payoutAgg?.[0]?.total ?? 0);
+    const investmentPaise = Math.round(investmentAgg?.[0]?.total ?? 0);
     // Shared pure math: totalExpenses, profitLoss (income − expenses) and
     // netPosition (profitLoss − investment) — see financeMath.js.
     const row = (0, _financeMath.computeSiteFinanceRow)({
       investmentPaise,
       incomePaise,
       expensePaise: materialAndOtherExpensePaise,
-      labourPaise: labourCostPaise
+      labourPaise: labourCostPaise,
+      workerPayoutPaise
     });
     return {
       siteId,
@@ -359,6 +409,7 @@ exports.FinanceService = {
       income: (0, _utils.paiseToRupees)(row.incomePaise),
       materialAndOtherExpenses: (0, _utils.paiseToRupees)(row.expensePaise),
       labourCost: (0, _utils.paiseToRupees)(row.labourPaise),
+      workerPayouts: (0, _utils.paiseToRupees)(row.workerPayoutPaise),
       totalExpenses: (0, _utils.paiseToRupees)(row.totalExpensesPaise),
       // NEW — admin investment for this site + position after recovering it:
       investment: (0, _utils.paiseToRupees)(row.investmentPaise),
@@ -370,14 +421,9 @@ exports.FinanceService = {
     };
   },
   /** Company-wide profit/loss (§18 of spec), summed across all sites with optional filters. */
-  async getCompanyProfitLoss(filter) {
-    const dateFilter = {};
-    if (filter.from || filter.to) {
-      dateFilter.date = {};
-      if (filter.from) dateFilter.date.$gte = new Date(filter.from);
-      if (filter.to) dateFilter.date.$lte = new Date(filter.to);
-    }
-    const [incomeAgg, expenseAgg, labourAgg, capitalAgg, investmentAgg] = await Promise.all([_Finance.FinancialTransaction.aggregate([{
+  async getCompanyProfitLoss(filter = {}) {
+    const dateFilter = buildDateFilter(filter);
+    const [incomeAgg, expenseAgg, labourAgg, payoutAgg, capitalAgg, investmentAgg] = await Promise.all([_Finance.FinancialTransaction.aggregate([{
       $match: {
         direction: "INCOME",
         ...dateFilter
@@ -415,6 +461,20 @@ exports.FinanceService = {
           }
         }
       }
+    }]), _SalaryLedger.SalaryLedger.aggregate([{
+      $match: {
+        type: { $in: PAYOUT_LEDGER_TYPES },
+        ...(dateFilter.date ? { date: dateFilter.date } : {})
+      }
+    }, {
+      $group: {
+        _id: null,
+        total: {
+          $sum: {
+            $toDouble: "$debitPaise"
+          }
+        }
+      }
     }]), _Finance.SiteCapital.aggregate([{
       $group: {
         _id: null,
@@ -442,12 +502,14 @@ exports.FinanceService = {
     }])]);
     const incomePaise = incomeAgg[0]?.total ?? 0;
     const otherExpensePaise = expenseAgg[0]?.total ?? 0;
-    const labourCostPaise = Math.round(labourAgg[0]?.total ?? 0);
-    const totalExpensePaise = (0, _utils.addPaise)(otherExpensePaise, labourCostPaise);
+    const labourCostPaise = Math.round(labourAgg?.[0]?.total ?? 0);
+    const workerPayoutPaise = Math.round(payoutAgg?.[0]?.total ?? 0);
+    const totalExpensePaise = (0, _utils.addPaise)(otherExpensePaise, labourCostPaise, workerPayoutPaise);
     return {
       totalIncome: (0, _utils.paiseToRupees)(incomePaise),
       totalOtherExpenses: (0, _utils.paiseToRupees)(otherExpensePaise),
       totalLabourCost: (0, _utils.paiseToRupees)(labourCostPaise),
+      totalWorkerPayouts: (0, _utils.paiseToRupees)(workerPayoutPaise),
       totalExpenses: (0, _utils.paiseToRupees)(totalExpensePaise),
       totalCapital: (0, _utils.paiseToRupees)(capitalAgg[0]?.total ?? 0),
       // NEW — company-wide admin investment total:
@@ -460,18 +522,12 @@ exports.FinanceService = {
    * GROSS SUMMARY (new): per-site investment / income / expenses /
    * profit-loss rows for EVERY site, plus company-wide gross totals — this
    * powers the Finance page's "all sites" table and the gross profit/loss
-   * KPI cards. Optional from/to filters apply to transactions and
-   * investments (labour cost follows the existing company-report behaviour
-   * and is always the full ledger).
+   * KPI cards. Optional from/to filters apply to transactions, salary-ledger
+   * labour, paid worker payouts and investments.
    */
-  async getGrossSummary(filter) {
-    const dateFilter = {};
-    if (filter?.from || filter?.to) {
-      dateFilter.date = {};
-      if (filter.from) dateFilter.date.$gte = new Date(filter.from);
-      if (filter.to) dateFilter.date.$lte = new Date(filter.to);
-    }
-    const [sites, txRows, labourRows, investmentRows] = await Promise.all([_Site.Site.find({}).select("name code status").sort({
+  async getGrossSummary(filter = {}) {
+    const dateFilter = buildDateFilter(filter);
+    const [sites, txRows, labourRows, payoutRows, investmentRows] = await Promise.all([_Site.Site.find({}).select("name code status").sort({
       name: 1
     }).lean(), _Finance.FinancialTransaction.aggregate([{
       $match: {
@@ -501,6 +557,20 @@ exports.FinanceService = {
           }
         }
       }
+    }]), _SalaryLedger.SalaryLedger.aggregate([{
+      $match: {
+        type: { $in: PAYOUT_LEDGER_TYPES },
+        ...(dateFilter.date ? { date: dateFilter.date } : {})
+      }
+    }, {
+      $group: {
+        _id: "$site",
+        total: {
+          $sum: {
+            $toDouble: "$debitPaise"
+          }
+        }
+      }
     }]), _Finance.SiteInvestment.aggregate([{
       $match: {
         ...dateFilter
@@ -526,8 +596,9 @@ exports.FinanceService = {
       if (!key) continue;
       if (r._id.direction === "INCOME") incomeBySite.set(key, r.total);else expenseBySite.set(key, r.total);
     }
-    const labourBySite = new Map(labourRows.map(r => [r._id?.toString(), Math.round(r.total)]));
-    const investmentBySite = new Map(investmentRows.map(r => [r._id?.toString(), Math.round(r.total)]));
+    const labourBySite = new Map((labourRows ?? []).map(r => [r._id?.toString(), Math.round(r.total)]));
+    const payoutBySite = new Map((payoutRows ?? []).map(r => [r._id?.toString(), Math.round(r.total)]));
+    const investmentBySite = new Map((investmentRows ?? []).map(r => [r._id?.toString(), Math.round(r.total)]));
     const paiseRows = [];
     const siteRows = sites.map(s => {
       const id = s._id.toString();
@@ -535,7 +606,8 @@ exports.FinanceService = {
         investmentPaise: investmentBySite.get(id) ?? 0,
         incomePaise: incomeBySite.get(id) ?? 0,
         expensePaise: expenseBySite.get(id) ?? 0,
-        labourPaise: labourBySite.get(id) ?? 0
+        labourPaise: labourBySite.get(id) ?? 0,
+        workerPayoutPaise: payoutBySite.get(id) ?? 0
       });
       paiseRows.push(row);
       return {
@@ -547,6 +619,7 @@ exports.FinanceService = {
         income: (0, _utils.paiseToRupees)(row.incomePaise),
         expenses: (0, _utils.paiseToRupees)(row.expensePaise),
         labourCost: (0, _utils.paiseToRupees)(row.labourPaise),
+        workerPayouts: (0, _utils.paiseToRupees)(row.workerPayoutPaise),
         totalExpenses: (0, _utils.paiseToRupees)(row.totalExpensesPaise),
         profitLoss: (0, _utils.paiseToRupees)(row.profitLossPaise),
         netPosition: (0, _utils.paiseToRupees)(row.netPositionPaise)
@@ -560,6 +633,7 @@ exports.FinanceService = {
         totalIncome: (0, _utils.paiseToRupees)(totals.incomePaise),
         totalOtherExpenses: (0, _utils.paiseToRupees)(totals.expensePaise),
         totalLabourCost: (0, _utils.paiseToRupees)(totals.labourPaise),
+        totalWorkerPayouts: (0, _utils.paiseToRupees)(totals.workerPayoutPaise),
         totalExpenses: (0, _utils.paiseToRupees)(totals.totalExpensesPaise),
         grossProfit: (0, _utils.paiseToRupees)(totals.grossProfitPaise),
         grossLoss: (0, _utils.paiseToRupees)(totals.grossLossPaise),
@@ -613,11 +687,8 @@ exports.FinanceService = {
   },
   async listCompanyExpenses(filter) {
     const query = {};
-    if (filter.from || filter.to) {
-      query.date = {};
-      if (filter.from) query.date.$gte = new Date(filter.from);
-      if (filter.to) query.date.$lte = new Date(filter.to);
-    }
+    const dateFilter = buildDateFilter(filter);
+    if (dateFilter.date) query.date = dateFilter.date;
     return _Finance.CompanyExpense.find(query).sort({ date: -1 });
   },
 
@@ -626,12 +697,7 @@ exports.FinanceService = {
   // "show me the cash paid out on this site to workers this week/month".
   async getSiteCashFlow(siteId, filter) {
     const siteObjectId = new _mongoose.Types.ObjectId(siteId);
-    const dateMatch = {};
-    if (filter?.from || filter?.to) {
-      dateMatch.date = {};
-      if (filter.from) dateMatch.date.$gte = new Date(filter.from);
-      if (filter.to) dateMatch.date.$lte = new Date(filter.to);
-    }
+    const dateMatch = buildDateFilter(filter);
     // Worker payouts: salary ledger debits (ADVANCE_DEDUCTION / KHARCHI_DEDUCTION)
     // on this site = cash paid out as advances/kharchi.
     const payoutAgg = await _SalaryLedger.SalaryLedger.aggregate([{

@@ -10,11 +10,16 @@ var _utils = require("@ananta/utils");
  * tests/unit/financeSummary.test.js). All inputs/outputs are INTEGER paise.
  *
  * Definitions used across the Finance page and API:
- *   totalExpenses = materialAndOtherExpenses + labourCost
+ *   totalExpenses = materialAndOtherExpenses + labourCost + workerPayouts
  *   profitLoss    = income − totalExpenses            (operating P/L of the site)
  *   netPosition   = profitLoss − investment           (P/L after recovering what
  *                                                      the admin invested)
  *   grossProfitLoss = Σ site profitLoss across all sites (company gross figure)
+ *
+ * Worker payouts are the salary-ledger deductions created by paid advances
+ * and Kharchi entries. They are site-linked cash expenses and must be part of
+ * the gross/site totals, even though they are also shown in the payroll
+ * deduction columns.
  */
 
 function computeSiteFinanceRow(partials) {
@@ -22,7 +27,8 @@ function computeSiteFinanceRow(partials) {
   const incomePaise = partials.incomePaise ?? 0;
   const expensePaise = partials.expensePaise ?? 0;
   const labourPaise = partials.labourPaise ?? 0;
-  const totalExpensesPaise = (0, _utils.addPaise)(expensePaise, labourPaise);
+  const workerPayoutPaise = partials.workerPayoutPaise ?? 0;
+  const totalExpensesPaise = (0, _utils.addPaise)(expensePaise, labourPaise, workerPayoutPaise);
   const profitLossPaise = (0, _utils.subtractPaise)(incomePaise, totalExpensesPaise);
   const netPositionPaise = (0, _utils.subtractPaise)(profitLossPaise, investmentPaise);
   return {
@@ -30,6 +36,7 @@ function computeSiteFinanceRow(partials) {
     incomePaise,
     expensePaise,
     labourPaise,
+    workerPayoutPaise,
     totalExpensesPaise,
     profitLossPaise,
     netPositionPaise
@@ -43,6 +50,7 @@ function computeGrossTotals(siteRows) {
     incomePaise: 0,
     expensePaise: 0,
     labourPaise: 0,
+    workerPayoutPaise: 0,
     totalExpensesPaise: 0,
     grossProfitPaise: 0,
     grossLossPaise: 0,
@@ -54,6 +62,7 @@ function computeGrossTotals(siteRows) {
     totals.incomePaise = (0, _utils.addPaise)(totals.incomePaise, row.incomePaise ?? 0);
     totals.expensePaise = (0, _utils.addPaise)(totals.expensePaise, row.expensePaise ?? 0);
     totals.labourPaise = (0, _utils.addPaise)(totals.labourPaise, row.labourPaise ?? 0);
+    totals.workerPayoutPaise = (0, _utils.addPaise)(totals.workerPayoutPaise, row.workerPayoutPaise ?? 0);
     totals.totalExpensesPaise = (0, _utils.addPaise)(totals.totalExpensesPaise, row.totalExpensesPaise ?? 0);
     totals.grossProfitLossPaise = (0, _utils.addPaise)(totals.grossProfitLossPaise, row.profitLossPaise ?? 0);
     if ((row.profitLossPaise ?? 0) >= 0) {

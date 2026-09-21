@@ -84,18 +84,21 @@ export function DashboardPage() {
     retry: false,
   });
 
-  useSocketInvalidate("attendance:created", [["finance", "company-profit-loss"]]);
-  useSocketInvalidate("site:profit_updated", [["finance", "company-profit-loss"]]);
+  useSocketInvalidate("attendance:created", [["finance", "company-profit-loss"], ["finance", "summary"]]);
+  useSocketInvalidate("site:profit_updated", [["finance", "company-profit-loss"], ["finance", "summary"]]);
   useSocketInvalidate("site:created", [["sites"]]);
   useSocketInvalidate("user:created", [["users"]]);
-  useSocketInvalidate("advance:created", [["advances"]]);
-  useSocketInvalidate("kharchi:created", [["kharchi"]]);
+  useSocketInvalidate("advance:created", [["advances"], ["finance", "company-profit-loss"], ["finance", "summary"]]);
+  useSocketInvalidate("advance:paid", [["finance", "company-profit-loss"], ["finance", "summary"]]);
+  useSocketInvalidate("kharchi:created", [["kharchi"], ["finance", "company-profit-loss"], ["finance", "summary"]]);
+  useSocketInvalidate("kharchi:approved", [["finance", "company-profit-loss"], ["finance", "summary"]]);
   useSocketInvalidate("worker:created", [["workers"]]);
 
   const chartData = pnl
     ? [
         { name: "Income", value: pnl.totalIncome },
         { name: "Labour", value: pnl.totalLabourCost },
+        { name: "Worker payouts", value: pnl.totalWorkerPayouts ?? 0 },
         { name: "Other Exp.", value: pnl.totalOtherExpenses },
         { name: "Profit", value: pnl.totalProfit },
       ]
@@ -107,6 +110,12 @@ export function DashboardPage() {
   const warningBudgetCount = (budgetAlerts ?? []).filter((a) => a.level === "WARNING").length;
   const equipmentAssigned = (equipment ?? []).filter((e) => e.status === "ASSIGNED").length;
   const diaryToday = (diary ?? []).filter((d) => { const x = new Date(d.date); const t = new Date(); return x.toDateString() === t.toDateString(); }).length;
+  // The summary is the gross, all-sites view. Prefer it for dashboard finance
+  // cards so site-linked advance/Kharchi payouts cannot be omitted from the
+  // company total while the separate company P/L request is still loading.
+  const grossTotals = summary?.totals;
+  const dashboardTotalExpenses = grossTotals?.totalExpenses ?? pnl?.totalExpenses;
+  const dashboardGrossProfitLoss = grossTotals?.grossProfitLoss ?? (pnl ? pnl.totalProfit - pnl.totalLoss : undefined);
 
   return (
     <div className="space-y-6">
@@ -138,8 +147,8 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <KpiCard label="Total income" value={pnl ? formatINR(pnl.totalIncome) : "—"} tone="positive" onClick={() => navigate("/finance?scope=company&tab=income")} />
-        <KpiCard label="Total expenses" value={pnl ? formatINR(pnl.totalExpenses) : "—"} tone="negative" onClick={() => navigate("/finance?scope=company&tab=expenses")} />
-        <KpiCard label="Company profit / loss" value={pnl ? formatINR(pnl.totalProfit - pnl.totalLoss) : "—"} tone={pnl && pnl.totalProfit - pnl.totalLoss >= 0 ? "positive" : "negative"} onClick={() => navigate("/finance?scope=company&tab=profit-loss")} />
+        <KpiCard label="Total expenses" value={dashboardTotalExpenses !== undefined ? formatINR(dashboardTotalExpenses) : "—"} tone="negative" sublabel={grossTotals ? `Gross · worker payouts ${formatINR(grossTotals.totalWorkerPayouts ?? 0)}` : undefined} onClick={() => navigate("/finance?scope=company&tab=expenses")} />
+        <KpiCard label="Company gross profit / loss" value={dashboardGrossProfitLoss !== undefined ? formatINR(dashboardGrossProfitLoss) : "—"} tone={dashboardGrossProfitLoss !== undefined && dashboardGrossProfitLoss >= 0 ? "positive" : "negative"} onClick={() => navigate("/finance?scope=company&tab=profit-loss")} />
       </div>
 
       {summary && (
