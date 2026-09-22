@@ -1,4 +1,3 @@
-import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
@@ -11,12 +10,15 @@ const queryClient = new QueryClient({
   }
 });
 
+// StrictMode double-mounts effects in development. YouTube's IFrame API (and
+// the react-youtube / youtube-player wrappers) destroy the player on that
+// immediate unmount and the second instance never becomes ready — the video
+// sits on "Loading player…" or error 153. Production builds do not do this,
+// but local dev is where the toggle player is tested.
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppRouter />
-      </BrowserRouter>
-    </QueryClientProvider>
-  </React.StrictMode>
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <AppRouter />
+    </BrowserRouter>
+  </QueryClientProvider>
 );

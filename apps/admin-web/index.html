@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- YouTube error 153 if this page sends no Referer. The iframe attribute
+         overrides this per embed; the meta tag covers every other request. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>Ananta Infratech Solutions</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

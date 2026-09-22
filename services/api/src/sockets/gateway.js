@@ -8,6 +8,7 @@ var _token = require("../modules/auth/token.service");
 var _sharedTypes = require("@ananta/shared-types");
 var _logger = require("../config/logger");
 var _env = require("../config/env");
+var _corsConfig = require("../config/cors");
 var _SiteAssignment = require("../db/models/SiteAssignment");
 var _WorkerProfile = require("../db/models/WorkerProfile");
 var _Site = require("../db/models/Site");
@@ -15,7 +16,9 @@ let io;
 function initSocketGateway(httpServer) {
   io = new _socket.Server(httpServer, {
     cors: {
-      origin: _env.env.CORS_ORIGIN,
+      // Same allow-list as Express. A literal "*" plus credentials is rejected
+      // by browsers, so the delegate reflects the caller when CORS_ORIGIN=*.
+      origin: _corsConfig.corsOriginDelegate(_env.env.CORS_ORIGIN),
       credentials: true
     }
   });

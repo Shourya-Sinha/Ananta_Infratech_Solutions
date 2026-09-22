@@ -519,12 +519,51 @@
   .video-result-duration { position: absolute; right: 0.15rem; bottom: 0.15rem; padding: 0 0.2rem; color: #fff; border-radius: 0.2rem; background: rgba(0, 0, 0, 0.78); font-size: 0.55rem; font-weight: 700; }
   .video-result-title { display: -webkit-box; overflow: hidden; color: #14181d; font-size: 0.72rem; font-weight: 600; line-height: 1.3; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .video-result-meta { display: block; overflow: hidden; margin-top: 0.15rem; color: #8d97a3; font-size: 0.63rem; text-overflow: ellipsis; white-space: nowrap; }
+  /* Wider than the music panel: YouTube refuses to play below 200×200, and a
+     16:9 frame inside the 23rem music panel is only ~190px tall. No backdrop-filter
+     or leftover transform — both make Chrome paint the iframe black / not play. */
+  .video-panel {
+    width: min(36rem, calc(100vw - 1.5rem));
+    z-index: 90;
+    background: #fff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    transform: none;
+    animation: video-panel-in 180ms ease both;
+  }
+  @keyframes video-panel-in { from { opacity: 0; } to { opacity: 1; } }
   .video-embed { margin-bottom: 0.75rem; }
-  .video-embed-frame { position: relative; overflow: hidden; border-radius: 0.75rem; background: #000; aspect-ratio: 16 / 9; box-shadow: 0 10px 26px rgba(20, 24, 29, 0.2); }
-  .video-embed-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
-  .video-embed-player, .video-embed-iframe, .video-embed-secondary-host { display: block; width: 100%; height: 100%; }
-  .video-embed-secondary-host iframe { display: block; width: 100%; height: 100%; border: 0; }
-  .video-embed-overlay { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.45rem; padding: 0.6rem; background: rgba(13, 16, 20, 0.72); text-align: center; }
+  .video-embed-frame {
+    position: relative;
+    overflow: visible;
+    border-radius: 0.75rem;
+    background: #000;
+    aspect-ratio: 16 / 9;
+    min-width: 200px;
+    min-height: 200px;
+    box-shadow: 0 10px 26px rgba(20, 24, 29, 0.2);
+  }
+  .video-embed-frame iframe { display: block; width: 100%; height: 100%; min-width: 200px; min-height: 200px; border: 0; border-radius: 0.75rem; }
+  .video-embed-player, .video-embed-iframe, .video-embed-secondary-host { display: block; width: 100%; height: 100%; min-height: 200px; }
+  .video-embed-secondary-host iframe { display: block; width: 100%; height: 100%; min-height: 200px; border: 0; border-radius: 0.75rem; }
+  .video-embed-status {
+    position: absolute;
+    left: 0.4rem;
+    bottom: 0.4rem;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    max-width: calc(100% - 0.8rem);
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(13, 16, 20, 0.78);
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 0.62rem;
+    line-height: 1.3;
+    pointer-events: none;
+  }
+  .video-embed-overlay { position: absolute; right: 0; bottom: 0; left: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.55rem; background: rgba(13, 16, 20, 0.9); text-align: center; border-radius: 0 0 0.75rem 0.75rem; }
   .video-embed-overlay-text { max-width: 95%; color: rgba(255, 255, 255, 0.85); font-size: 0.66rem; line-height: 1.4; }
   .video-embed-play-big { display: inline-flex; width: 2.7rem; height: 2.7rem; align-items: center; justify-content: center; color: #fff; border: 0; border-radius: 50%; background: linear-gradient(135deg, #e0483c, #b3271d); cursor: pointer; box-shadow: 0 10px 24px rgba(179, 39, 29, 0.42); transition: transform 160ms ease; }
   .video-embed-play-big:hover { transform: scale(1.08); }

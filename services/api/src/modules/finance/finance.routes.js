@@ -5,6 +5,8 @@ exports.financeRouter = void 0;
 var _express = require("express");
 var _zod = require("zod");
 var _finance = require("./finance.service");
+var _financeExport = require("./financeExport");
+var _AppError = require("../../errors/AppError");
 var _authenticate = require("../../middleware/authenticate");
 var _rbac = require("../../middleware/rbac");
 var _errorHandler = require("../../middleware/errorHandler");
@@ -197,6 +199,37 @@ financeRouter.get("/summary", (0, _rbac.requirePermission)("financialReports.rea
     data: result
   };
   res.json(body);
+}));
+
+/**
+ * One file, sections kept apart: each worker's expenses, the worker-expense
+ * total, total investment, total income, each site, then the gross.
+ * format=pdf | doc | xls (docx/xlsx accepted as aliases).
+ */
+financeRouter.get("/export", (0, _rbac.requirePermission)("financialReports.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const first = (value) => Array.isArray(value) ? value[0] : value;
+  const format = _financeExport.normalizeExportFormat(first(req.query.format) || "pdf");
+  if (!format) {
+    throw _AppError.AppError.validation("Choose a file type: PDF, Word (.doc), or Excel (.xls).");
+  }
+  const optionalDate = (value) => {
+    const raw = first(value);
+    return raw == null || raw === "" ? undefined : raw;
+  };
+  const query = _zod.z.object({
+    from: _zod.z.string().date().optional(),
+    to: _zod.z.string().date().optional()
+  }).parse({
+    from: optionalDate(req.query.from),
+    to: optionalDate(req.query.to)
+  });
+  const report = await _finance.FinanceService.getFinancialExport(query);
+  const file = _financeExport.renderFinancialExport(report, format);
+  res.setHeader("Content-Type", file.contentType);
+  res.setHeader("Content-Disposition", `attachment; filename="${file.filename}"`);
+  res.setHeader("Content-Length", file.buffer.length);
+  res.setHeader("Cache-Control", "private, no-store");
+  res.status(200).end(file.buffer);
 }));
 
 // --- Company expenses (office/admin, not site-specific) -----------------

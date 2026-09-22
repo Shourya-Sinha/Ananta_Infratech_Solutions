@@ -11,6 +11,8 @@ var _sharedTypes = require("@ananta/shared-types");
 var _utils = require("@ananta/utils");
 var _mongoose = require("mongoose");
 var _financeMath = require("./financeMath");
+var _financeExport = require("./financeExport");
+var _WorkerProfile = require("../../db/models/WorkerProfile");
 
 // Date-only filters represent calendar days. Using the end of the `to` day
 // prevents a monthly report from dropping every transaction after midnight on
@@ -644,6 +646,55 @@ exports.FinanceService = {
         siteCount: sites.length
       }
     };
+  },
+
+  /**
+   * Company-wide export behind GET /finance/export. Same date window and the
+   * same gross rules as getGrossSummary, plus a per-worker breakdown the
+   * summary does not carry. The file renderer keeps each section separate.
+   */
+  async getFinancialExport(filter = {}) {
+    const periodError = _financeExport.exportPeriodError(filter);
+    if (periodError) throw _AppError.AppError.validation(periodError);
+    const dateFilter = buildDateFilter(filter);
+    const dateQuery = dateFilter.date ? { date: dateFilter.date } : {};
+    const [sites, transactions, investments, ledger, workers] = await Promise.all([
+      _Site.Site.find({}).select("name code status").sort({ name: 1 }).lean(),
+      _Finance.FinancialTransaction.find(dateQuery).select("site direction category amountPaise date description reversalOf").lean(),
+      _Finance.SiteInvestment.find(dateQuery).select("site type amountPaise date reference note reversalOf").lean(),
+      _SalaryLedger.SalaryLedger.find({
+        type: { $in: ["EARNING", "OVERTIME", "ADVANCE_DEDUCTION", "KHARCHI_DEDUCTION", "REVERSAL", "ADJUSTMENT"] },
+        ...dateQuery
+      }).select("worker site date type description creditPaise debitPaise reference").lean(),
+      _WorkerProfile.WorkerProfile.find({}).select("employeeId user").populate({ path: "user", select: "name" }).lean()
+    ]);
+    return _financeExport.buildFinancialExport({
+      generatedAt: new Date(),
+      period: { from: filter.from || null, to: filter.to || null },
+      sites: sites.map((site) => ({
+        id: site._id.toString(),
+        name: site.name,
+        code: site.code,
+        status: site.status
+      })),
+      transactions,
+      investments,
+      ledger: ledger.map((entry) => ({
+        workerId: entry.worker,
+        siteId: entry.site,
+        date: entry.date,
+        type: entry.type,
+        description: entry.description,
+        creditPaise: entry.creditPaise,
+        debitPaise: entry.debitPaise,
+        reference: entry.reference
+      })),
+      workers: workers.map((worker) => ({
+        id: worker._id.toString(),
+        employeeId: worker.employeeId,
+        name: worker.user?.name || ""
+      }))
+    });
   },
 
   // --- Company expenses (office/admin, not site-specific) --------------

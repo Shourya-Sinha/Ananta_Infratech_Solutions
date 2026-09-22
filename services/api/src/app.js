@@ -33,12 +33,30 @@ var _equipment = require("./modules/equipment/equipment.routes");
 var _diary = require("./modules/diary/diary.routes");
 var _media = require("./modules/media/media.routes");
 var _openapi = require("./config/openapi");
+var _corsConfig = require("./config/cors");
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function createApp() {
   const app = (0, _express.default)();
-  app.use((0, _helmet.default)());
+  // Helmet's defaults (Referrer-Policy: no-referrer, CORP: same-origin) break
+  // two different things that both look like "the video will not play":
+  //   - no-referrer makes YouTube embeds return error 153 if this process also
+  //     serves the admin HTML (or a reverse proxy copies these headers onto it)
+  //   - CORP same-origin blocks the admin origin from reading API responses,
+  //     which the browser reports as a CORS failure on /media/youtube/search
+  app.use((0, _helmet.default)({
+    referrerPolicy: {
+      policy: "strict-origin-when-cross-origin"
+    },
+    crossOriginResourcePolicy: {
+      policy: "cross-origin"
+    },
+    crossOriginOpenerPolicy: {
+      policy: "same-origin-allow-popups"
+    },
+    crossOriginEmbedderPolicy: false
+  }));
   app.use((0, _cors.default)({
-    origin: _env.env.CORS_ORIGIN === "*" ? true : _env.env.CORS_ORIGIN.split(","),
+    origin: (0, _corsConfig.corsOriginDelegate)(_env.env.CORS_ORIGIN),
     credentials: true
   }));
   app.use(_express.default.json({

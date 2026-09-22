@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/Toast";
 import { formatINR, formatDate, cx } from "@/lib/format";
 import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
+import { FinanceExportBar } from "@/features/finance/FinanceExportBar";
 
 const EXPENSE_CATEGORIES = ["MATERIAL", "LABOUR", "TRANSPORT", "EQUIPMENT", "ELECTRICITY", "RENT", "FOOD", "MAINTENANCE", "VENDOR_PAYMENT", "OTHER"];
 const INCOME_CATEGORIES = ["CLIENT_PAYMENT", "CONTRACT_PAYMENT", "MILESTONE_PAYMENT", "OTHER"];
@@ -268,8 +269,10 @@ export function FinancePage() {
     <div className="space-y-4">
       <div>
         <h1 className="font-display text-xl font-semibold text-graphite-900">Finance</h1>
-        <p className="text-sm text-graphite-500">Investments, capital, income, expenses, worker payouts, company expenses, budget alerts — per site and company-wide.</p>
+        <p className="text-sm text-graphite-500">Investments, capital, income, expenses, worker payouts, company expenses, budget alerts — per site and company-wide. Export the separated report as PDF, Word, or Excel.</p>
       </div>
+
+      <FinanceExportBar />
 
       {summaryLoading ? (
         <div className="card animate-pulse p-4 text-sm text-graphite-300">Loading company summary…</div>
