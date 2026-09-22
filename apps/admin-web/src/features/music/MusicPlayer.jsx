@@ -447,6 +447,11 @@ export function MusicProvider({ children }) {
   );
 
   const scanFolder = useCallback(async () => {
+    // Folder-pick policy: one primary method (webkitdirectory input below)
+    // plus at most two fallbacks (this File System Access walk, and
+    // drag-and-drop). All native browser APIs — no libraries. A permission
+    // prompt appears only when the browser reports state "prompt", i.e. only
+    // when reads would fail without it; granted/denied states never prompt.
     setScanError("");
     setScanStatus("");
 
@@ -489,7 +494,10 @@ export function MusicProvider({ children }) {
 
     setIsScanning(true);
     try {
-      // Explicitly request read permission; without it the walk yields nothing.
+      // Ask for read permission only when the browser says it is needed.
+      // queryPermission() itself never prompts; requestPermission() runs only
+      // when the state is "prompt" (reads would fail without it). If the
+      // state is already "granted" or "denied", no prompt appears at all.
       if (typeof directory.queryPermission === "function") {
         let permission = await directory.queryPermission({ mode: "read" });
         if (permission === "prompt" && typeof directory.requestPermission === "function") {
