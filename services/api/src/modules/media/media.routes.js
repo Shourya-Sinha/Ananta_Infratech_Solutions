@@ -17,6 +17,19 @@ const searchSchema = z.object({
 });
 
 /**
+ * GET /api/v1/media/youtube/config
+ * Tells the admin player whether YOUTUBE_API_KEY was loaded. The browser logs
+ * this on panel open so a missing key / CORS rejection is visible in DevTools.
+ * Does not return the key.
+ */
+mediaRouter.get(
+  "/youtube/config",
+  asyncHandler(async (_req, res) => {
+    res.json({ success: true, data: MediaService.getYouTubeConfig() });
+  })
+);
+
+/**
  * GET /api/v1/media/youtube/search?q=...&limit=12
  * Returns embeddable YouTube results for the mini player. Any authenticated
  * admin may search; no extra permission is required for a read-only lookup.

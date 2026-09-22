@@ -128,12 +128,35 @@ async function searchViaScrape(query, limit) {
   return items;
 }
 
+function readYouTubeApiKey() {
+  // Quotes and whitespace are a common .env mistake and make Google reject an
+  // otherwise valid key. Never log the key itself.
+  return String(process.env.YOUTUBE_API_KEY ?? "")
+    .trim()
+    .replace(/^['"]|['"]$/g, "");
+}
+
+async function readYouTubeError(response) {
+  const body = await response.text();
+  try {
+    const parsed = JSON.parse(body);
+    const message = parsed?.error?.message || parsed?.error?.status;
+    if (message) return String(message).slice(0, 300);
+  } catch {
+    // Not JSON — fall through to a truncated body.
+  }
+  return body.replace(/\s+/g, " ").slice(0, 300);
+}
+
 async function searchViaDataApi(query, limit, apiKey) {
   const url =
     "https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true" +
     `&maxResults=${limit}&q=${encodeURIComponent(query)}&key=${encodeURIComponent(apiKey)}`;
   const response = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error(`YouTube Data API responded ${response.status}`);
+  if (!response.ok) {
+    const reason = await readYouTubeError(response);
+    throw new Error(`YouTube Data API responded ${response.status}: ${reason}`);
+  }
   const payload = await response.json();
   return (payload.items ?? [])
     .filter((item) => item.id?.videoId)
@@ -152,9 +175,25 @@ async function searchViaDataApi(query, limit, apiKey) {
 }
 
 // Exported for unit tests: the scrape parser is the fragile part of this module.
-exports.__testing = { extractInitialData, collectVideoRenderers, normaliseScraped, readText };
+exports.__testing = { extractInitialData, collectVideoRenderers, normaliseScraped, readText, readYouTubeApiKey };
 
 exports.MediaService = {
+  /**
+   * Safe diagnostics for the admin player. Confirms the key was loaded from
+   * .env without ever returning the key itself.
+   */
+  getYouTubeConfig() {
+    const apiKey = readYouTubeApiKey();
+    return {
+      keyConfigured: Boolean(apiKey),
+      keyLength: apiKey.length,
+      keySuffix: apiKey ? apiKey.slice(-4) : null,
+      corsOrigin: process.env.CORS_ORIGIN || "*",
+      // Playback does not use this key. It is only for /youtube/search.
+      playbackUsesApiKey: false
+    };
+  },
+
   /**
    * Searches YouTube for embeddable videos. Uses the official Data API when a
    * key is configured and falls back to parsing the public results page, so the
@@ -171,34 +210,50 @@ exports.MediaService = {
 
     // Read lazily from process.env: the key is optional, so this module stays
     // usable (and unit-testable) without booting the full env config.
-    const apiKey = process.env.YOUTUBE_API_KEY;
+    // The key is only used for search. Playback does not call the Data API.
+    const apiKey = readYouTubeApiKey();
     const attempts = [];
-    if (apiKey) attempts.push(() => searchViaDataApi(trimmed, safeLimit, apiKey));
-    attempts.push(() => searchViaScrape(trimmed, safeLimit));
+    if (apiKey) attempts.push({ label: "data-api", run: () => searchViaDataApi(trimmed, safeLimit, apiKey) });
+    attempts.push({ label: "scrape", run: () => searchViaScrape(trimmed, safeLimit) });
+
+    if (process.env.NODE_ENV !== "test") {
+      console.info(
+        `[media] YouTube search start keyConfigured=${Boolean(apiKey)} keyLength=${apiKey.length} corsOrigin=${process.env.CORS_ORIGIN || "*"}`
+      );
+    }
 
     let lastError = null;
     for (const attempt of attempts) {
       try {
-        const items = await attempt();
+        const items = await attempt.run();
         if (items.length > 0) {
           cacheSet(cacheKey, items);
-          return { items, cached: false };
+          if (process.env.NODE_ENV !== "test") {
+            console.info(`[media] YouTube search ok via ${attempt.label} count=${items.length}`);
+          }
+          return { items, cached: false, source: attempt.label };
         }
         lastError = null;
+        if (process.env.NODE_ENV !== "test") {
+          console.info(`[media] YouTube search via ${attempt.label} returned no videos`);
+        }
       } catch (error) {
         // Surface why a path failed (e.g. an invalid or quota-exhausted
         // YOUTUBE_API_KEY) without breaking the scrape fallback.
         if (process.env.NODE_ENV !== "test") {
-          console.warn(`[media] YouTube search path failed: ${error?.message || error}`);
+          console.warn(`[media] YouTube search path ${attempt.label} failed: ${error?.message || error}`);
         }
         lastError = error;
       }
     }
 
     if (lastError) {
+      const reason = String(lastError.message || "upstream failed")
+        .replace(/key=[^&\s]+/gi, "key=(redacted)")
+        .slice(0, 240);
       throw new AppError(
         ERROR_CODES.INTERNAL_ERROR,
-        "YouTube search is unavailable right now. Try again in a moment.",
+        `YouTube search is unavailable right now. ${reason}`,
         502
       );
     }

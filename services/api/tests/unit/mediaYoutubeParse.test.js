@@ -2,7 +2,7 @@
 
 const { __testing } = require("../../src/modules/media/media.service");
 
-const { extractInitialData, collectVideoRenderers, normaliseScraped, readText } = __testing;
+const { extractInitialData, collectVideoRenderers, normaliseScraped, readText, readYouTubeApiKey } = __testing;
 
 function buildPage(data) {
   return `<!doctype html><html><body><script nonce="x">var ytInitialData = ${JSON.stringify(data)};</script></body></html>`;
@@ -91,6 +91,13 @@ describe("YouTube results parsing", () => {
     // Falls back to longBylineText and a derived thumbnail URL.
     expect(second.channel).toBe("Build Channel");
     expect(second.thumbnail).toBe("https://i.ytimg.com/vi/abcdefghijk/mqdefault.jpg");
+  });
+
+  it("strips quotes and whitespace from YOUTUBE_API_KEY without logging the key", () => {
+    const previous = process.env.YOUTUBE_API_KEY;
+    process.env.YOUTUBE_API_KEY = "  'abc123secret'  ";
+    expect(readYouTubeApiKey()).toBe("abc123secret");
+    process.env.YOUTUBE_API_KEY = previous;
   });
 
   it("does not recurse infinitely on self-referencing objects", () => {

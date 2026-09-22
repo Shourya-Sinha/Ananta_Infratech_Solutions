@@ -13,6 +13,9 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5173,
     allowedHosts: true,
+    headers: {
+      "Referrer-Policy": "strict-origin-when-cross-origin"
+    },
     proxy: {
       "/api": {
         target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost:4000",
@@ -23,6 +26,14 @@ export default defineConfig({
         ws: true,
         changeOrigin: true
       }
+    }
+  },
+  preview: {
+    host: "0.0.0.0",
+    port: 4173,
+    allowedHosts: true,
+    headers: {
+      "Referrer-Policy": "strict-origin-when-cross-origin"
     }
   }
 });
