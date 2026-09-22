@@ -79,6 +79,19 @@ function createApp() {
       }
     });
   });
+  // Public, auth-free sibling of /health under the versioned prefix. The
+  // admin web app polls this (through the Vite /api proxy) to show an
+  // "API server unreachable" banner instead of failing every query silently.
+  app.get("/api/v1/status", (_req, res) => {
+    res.json({
+      success: true,
+      data: {
+        status: "ok",
+        env: _env.env.NODE_ENV,
+        time: new Date().toISOString()
+      }
+    });
+  });
   (0, _openapi.mountApiDocs)(app); // GET /api/v1/docs (Swagger UI), /api/v1/openapi.json
 
   app.use("/api/v1/auth", _auth.authRouter);

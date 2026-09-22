@@ -17,7 +17,9 @@ const queryClient = new QueryClient({
 // but local dev is where the toggle player is tested.
 ReactDOM.createRoot(document.getElementById("root")).render(
   <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
+    {/* Opt into the v7 behaviours early so the dev console stays free of
+        React Router future-flag warnings. */}
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AppRouter />
     </BrowserRouter>
   </QueryClientProvider>

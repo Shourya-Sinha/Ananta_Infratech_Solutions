@@ -96,7 +96,9 @@ financeRouter.post("/income", (0, _rbac.requirePermission)("site.income.create")
   };
   res.status(201).json(body);
 }));
-financeRouter.get("/income", (0, _rbac.requirePermission)("site.income.create"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+// Read-only list: users who may record income OR view financial reports
+// (e.g. Managers) can read. Recording still requires the create permission.
+financeRouter.get("/income", (0, _rbac.requireAnyPermission)("site.income.create", "financialReports.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   const query = _zod.z.object({
     site: _zod.z.string().optional(),
     from: _zod.z.string().date().optional(),
@@ -131,7 +133,9 @@ financeRouter.post("/expenses", (0, _rbac.requirePermission)("site.expense.creat
   };
   res.status(201).json(body);
 }));
-financeRouter.get("/expenses", (0, _rbac.requirePermission)("site.expense.create"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+// Read-only list: users who may record expenses OR view financial reports
+// (e.g. Managers) can read. Recording still requires the create permission.
+financeRouter.get("/expenses", (0, _rbac.requireAnyPermission)("site.expense.create", "financialReports.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   const query = _zod.z.object({
     site: _zod.z.string().optional(),
     from: _zod.z.string().date().optional(),

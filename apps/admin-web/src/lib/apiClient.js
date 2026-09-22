@@ -65,13 +65,24 @@ api.interceptors.response.use(
 
 /**
  * Unwraps the {success,data}/{success:false,error} envelope, throwing a readable Error on failure.
- * The thrown Error also carries `code` and `details` from the API envelope so callers can react to
- * specific error kinds (e.g. the worker-registration duplicate warning) instead of just the message.
+ * The thrown Error carries the server's message (so toasts/login errors show
+ * "Invalid phone or password", not "Request failed with status code 401"),
+ * plus `code`/`details` from the envelope (e.g. the worker-registration
+ * duplicate warning) and `status`/`response` passthrough for callers that
+ * inspect the raw HTTP failure (field errors, API-offline detection).
  */
-function enrich(error, envelope) {
-  const e = error instanceof Error ? error : new Error(envelope?.message ?? "Request failed");
+function enrich(error, envelope, source) {
+  const message =
+    envelope?.message ||
+    (error instanceof Error && error.message ? error.message : undefined) ||
+    "Request failed";
+  const e = new Error(message);
   e.code = envelope?.code;
   e.details = envelope?.details;
+  e.status = source?.response?.status;
+  // Keep the axios response/error reachable for specialised handlers.
+  e.response = source?.response;
+  e.cause = error instanceof Error ? error : undefined;
   return e;
 }
 
@@ -81,10 +92,10 @@ export async function unwrap(promise) {
     res = await promise;
   } catch (err) {
     const envelope = err?.response?.data?.error;
-    throw enrich(err instanceof Error ? err : undefined, envelope);
+    throw enrich(err instanceof Error ? err : undefined, envelope, err);
   }
-  if (res.data.success) return res.data.data;
-  throw enrich(undefined, res.data.error);
+  if (res.data?.success) return res.data.data;
+  throw enrich(undefined, res.data?.error, res);
 }
 
 export { getDeviceId };

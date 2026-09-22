@@ -119,7 +119,7 @@ function installYouTubeIframePatch() {
       get: srcDesc.get,
       set(value) {
         stamp(this, value);
-        return srcDesc.set.call(this, value);
+        srcDesc.set.call(this, value);
       }
     });
   }

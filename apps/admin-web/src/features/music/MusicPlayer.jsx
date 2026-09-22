@@ -392,7 +392,7 @@ export function MusicProvider({ children }) {
       setScanStatus("");
       setScanError(
         total > 0
-          ? `Scanned ${total} file${total === 1 ? "" : "s"} in “${folderName}” but found no MP3/WAV/M4A/OGG/FLAC audio. Pick the folder that directly contains your music, or use “Add songs”.`
+          ? `Scanned ${total} file${total === 1 ? "" : "s"} in “${folderName}” but found no MP3/WAV/M4A/OGG/FLAC audio. Pick the folder that directly contains your music (open the drive, then choose a folder inside it), or use “Add songs”.`
           : `“${folderName}” looks empty or could not be read. Pick the music folder itself, or use “Add songs”.`
       );
     }
@@ -406,8 +406,14 @@ export function MusicProvider({ children }) {
       const folderName = files[0].webkitRelativePath?.split("/")[0] || "Selected folder";
       setIsScanning(true);
       try {
-        const added = addFiles(files, folderName, { silentWhenEmpty: true });
-        reportFolderResult(added, files.length, folderName);
+        // Pre-filter to audio before creating object URLs: a whole-drive
+        // folder can contain tens of thousands of non-audio files, and
+        // turning every one of them into a track would freeze the tab.
+        const audioFiles = files.filter(isAudioFile);
+        const truncated = audioFiles.length > MAX_SCAN_FILES;
+        const capped = truncated ? audioFiles.slice(0, MAX_SCAN_FILES) : audioFiles;
+        const added = addFiles(capped, folderName, { silentWhenEmpty: true });
+        reportFolderResult(added, truncated ? MAX_SCAN_FILES : Math.max(files.length, audioFiles.length), folderName);
       } finally {
         setIsScanning(false);
       }
@@ -685,8 +691,12 @@ export function MusicPlayer() {
         multiple
         className="hidden"
         onChange={(event) => {
-          const files = event.target.files;
-          // Reset first so picking the same folder again still fires `change`.
+          // Snapshot the FileList into a plain array BEFORE resetting the
+          // input: `input.files` is a live view backed by the input, so
+          // clearing `value` first empties the very list we just grabbed and
+          // every folder scan silently finds zero songs.
+          const files = Array.from(event.target.files ?? []);
+          // Reset so picking the same folder again still fires `change`.
           event.target.value = "";
           music.handleFolderFiles(files);
         }} />
@@ -813,7 +823,7 @@ export function MusicPlayer() {
               <Upload size={15} /> Add songs
             </button>
           </div>
-          <p className="music-help">Pick any folder on any drive (C:, D:, external disks) — every song inside it and its sub-folders is added at once. You can also drag a whole folder here.</p>
+          <p className="music-help">Pick the folder that holds your music on any drive (C:, D:, external disks) — every song inside it and its sub-folders is added at once. Tip: browsers can&apos;t select a bare drive letter, so open the drive and pick a folder inside it (e.g. D:\Music). You can also drag a whole folder here.</p>
 
           {music.tracks.length > 0 && (
             <div className="music-library-list">
