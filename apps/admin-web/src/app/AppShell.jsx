@@ -28,6 +28,7 @@ import {
 import { useAuthStore } from "@/stores/authStore";
 import { useLogout } from "@/features/auth/api";
 import { NotificationBell } from "@/components/ui/NotificationBell";
+import { ApiStatusBanner } from "@/components/ui/ApiStatusBanner";
 import { ToastProvider } from "@/components/ui/Toast";
 import { MusicPlayer, MusicProvider } from "@/features/music/MusicPlayer";
 import { VideoProvider, VideoSearchToggle } from "@/features/video/VideoPlayer";
@@ -196,6 +197,7 @@ export function AppShell() {
 
               <main className="app-main">
                 <div key={`${location.pathname}${location.search}`} className="page-enter">
+                  <ApiStatusBanner />
                   <Outlet />
                 </div>
               </main>

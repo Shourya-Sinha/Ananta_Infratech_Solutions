@@ -302,22 +302,49 @@ screens confirmed present in the compiled output — not just linted.
 cp .env.example .env        # fill in real secrets before anything but local dev
 npm install
 sh infra/docker/start-dev-services.sh   # starts MongoDB + Redis via plain docker run
-npm run dev:api
-# in another terminal, once Mongo is up:
-npm run seed
-# admin web app:
-npm run dev:admin-web
+# → on Windows PowerShell without Git Bash, run the two `docker run` lines
+#   from that script directly (one for mongo:7, one for redis:7-alpine).
+npm run seed                # one-time: roles, permissions, super admin (safe to re-run)
+npm run dev                 # starts API + admin web together (see below for separate)
 # mobile app (Expo — scan the QR code with Expo Go, or press 'a'/'i' for an
 # emulator/simulator if you have Android Studio/Xcode installed):
 npm run dev:mobile
 ```
 
-API listens on `http://localhost:4000`. Health check: `GET /health`.
+Prefer separate terminals? `npm run dev:api` and `npm run dev:admin-web`
+do the same thing individually — the admin web app needs the API running,
+otherwise every panel shows "API server isn't reachable".
+
+API listens on `http://localhost:4000`. Health check: `GET /health`
+(public status for the admin banner: `GET /api/v1/status`).
 API docs: `http://localhost:4000/api/v1/docs`.
 Admin web app: `http://localhost:5173` (proxies `/api` and `/socket.io` to the API).
 Mobile app: set `extra.apiBaseUrl` in `apps/mobile/app.json` to your
 machine's LAN IP (not `localhost`) if testing on a physical device or
 most emulators.
+
+### Troubleshooting
+
+- **`[vite] API unreachable` / red "API server isn't reachable" banner:**
+  the backend on port 4000 isn't answering. Start it (`npm run dev:api`),
+  then check (a) MongoDB/Redis containers are up
+  (`docker ps` should list `ananta-mongo` + `ananta-redis`), (b) `.env`
+  exists at the repo root (copy `.env.example`), and (c) the API
+  terminal for the `❌ Invalid environment configuration` message, which
+  names the exact missing variable.
+- **`403 Forbidden` on materials / equipment / site-diary (or any route
+  that used to work):** the database was seeded before that permission
+  key existed. Just restart the API — every boot gap-fills missing
+  permission rows automatically without touching admin-customised
+  toggles (see `services/api/src/db/syncPermissions.js`). Re-running
+  `npm run seed` is equally safe and does the same fill.
+- **Music player "Scan folder / drive" finds nothing:** pick the folder
+  that directly holds your music (open the drive, then choose a folder
+  inside it — browsers can't select a bare drive letter like `D:`).
+  "Add songs" works file-by-file as a fallback.
+- **Reports → Export CSV downloads an error/blank page:** fixed — export
+  now goes through the authenticated client. If you still see it, hard
+  refresh (`Ctrl+Shift+R`) to drop the cached bundle.
 Log in with the seeded Super Admin (`SEED_SUPER_ADMIN_PHONE`/`SEED_SUPER_ADMIN_PASSWORD`
 from `.env`, default `9999999999` / `ChangeMe123!` — change this
 immediately in any real deployment) on the admin web app. The mobile app

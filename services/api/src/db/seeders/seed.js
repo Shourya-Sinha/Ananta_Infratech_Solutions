@@ -1,105 +1,74 @@
-var _argon = _interopRequireDefault(require("argon2"));
-var _db = require("../../config/db");
-var _logger = require("../../config/logger");
-var _Role = require("../models/Role");
-var _Permission = require("../models/Permission");
-var _User = require("../models/User");
-var _sharedTypes = require("@ananta/shared-types");
-var _constants = require("@ananta/constants");
-function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+"use strict";
+
+// Database seeder. Safe to re-run at any time:
+//   - roles are upserted by key (labels refresh, nothing else changes),
+//   - permissions + role-permission rows go through syncPermissions(), which
+//     only INSERTS missing rows and never overwrites toggles an admin has
+//     customised in Permission Management,
+//   - the super admin is created only when its phone number is absent.
+
+const argon2 = require("argon2");
+const { connectDB, disconnectDB } = require("../../config/db");
+const { logger } = require("../../config/logger");
+const { Role } = require("../models/Role");
+const { User } = require("../models/User");
+const { ROLE_KEYS } = require("@ananta/shared-types");
+const { syncPermissions } = require("../syncPermissions");
+
 const ROLE_LABELS = {
   SUPER_ADMIN: "Super Admin",
   MANAGER: "Manager",
-  WORKER: "Worker"
+  WORKER: "Worker",
 };
+
 async function seedRoles() {
   const roleDocs = new Map();
-  for (const key of _sharedTypes.ROLE_KEYS) {
-    const role = await _Role.Role.findOneAndUpdate({
-      key
-    }, {
-      key,
-      label: ROLE_LABELS[key],
-      isSystemRole: true
-    }, {
-      upsert: true,
-      new: true
-    });
+  for (const key of ROLE_KEYS) {
+    const role = await Role.findOneAndUpdate(
+      { key },
+      { key, label: ROLE_LABELS[key], isSystemRole: true },
+      { upsert: true, new: true }
+    );
     roleDocs.set(key, role);
   }
-  _logger.logger.info(`Seeded ${roleDocs.size} roles`);
+  logger.info(`Seeded ${roleDocs.size} roles`);
   return roleDocs;
 }
-async function seedPermissions() {
-  const permissionDocs = new Map();
-  for (const p of _constants.PERMISSIONS) {
-    const perm = await _Permission.Permission.findOneAndUpdate({
-      key: p.key
-    }, {
-      key: p.key,
-      group: p.group,
-      description: p.description
-    }, {
-      upsert: true,
-      new: true
-    });
-    permissionDocs.set(p.key, perm);
-  }
-  _logger.logger.info(`Seeded ${permissionDocs.size} permissions`);
-  return permissionDocs;
-}
-async function seedRolePermissions(roleDocs, permissionDocs) {
-  let count = 0;
-  for (const roleKey of _sharedTypes.ROLE_KEYS) {
-    const role = roleDocs.get(roleKey);
-    const defaultKeys = new Set(_constants.DEFAULT_ROLE_PERMISSIONS[roleKey]);
-    for (const [permKey, permDoc] of permissionDocs) {
-      await _Permission.RolePermission.findOneAndUpdate({
-        role: role._id,
-        permission: permDoc._id
-      }, {
-        enabled: defaultKeys.has(permKey)
-      }, {
-        upsert: true
-      });
-      count++;
-    }
-  }
-  _logger.logger.info(`Seeded ${count} role-permission entries`);
-}
+
 async function seedSuperAdmin(roleDocs) {
   const phone = process.env.SEED_SUPER_ADMIN_PHONE ?? "9999999999";
   const password = process.env.SEED_SUPER_ADMIN_PASSWORD ?? "ChangeMe123!";
-  const existing = await _User.User.findOne({
-    phone
-  });
+  const existing = await User.findOne({ phone });
   if (existing) {
-    _logger.logger.info("Super admin already exists, skipping");
+    logger.info("Super admin already exists, skipping");
     return;
   }
-  const passwordHash = await _argon.default.hash(password);
-  await _User.User.create({
+  const passwordHash = await argon2.hash(password);
+  await User.create({
     role: roleDocs.get("SUPER_ADMIN")._id,
     name: "Ananta Super Admin",
     phone,
     passwordHash,
     status: "ACTIVE",
-    phoneVerified: true
+    phoneVerified: true,
   });
-  _logger.logger.warn(`Seeded super admin: phone=${phone} password=${password} — CHANGE THIS PASSWORD IMMEDIATELY.`);
+  logger.warn(`Seeded super admin: phone=${phone} password=${password} — CHANGE THIS PASSWORD IMMEDIATELY.`);
 }
+
 async function main() {
-  await (0, _db.connectDB)();
+  await connectDB();
   const roleDocs = await seedRoles();
-  const permissionDocs = await seedPermissions();
-  await seedRolePermissions(roleDocs, permissionDocs);
+  // Roles must exist before the sync below can attach rows to them.
+  if (roleDocs.size > 0) {
+    const { permissions, insertedRolePermissions } = await syncPermissions();
+    logger.info(`Seeded ${permissions} permissions (${insertedRolePermissions} new role-permission row(s))`);
+  }
   await seedSuperAdmin(roleDocs);
-  await (0, _db.disconnectDB)();
-  _logger.logger.info("Seeding complete");
+  await disconnectDB();
+  logger.info("Seeding complete");
 }
-main().catch(err => {
-  _logger.logger.error({
-    err
-  }, "Seeding failed");
+
+main().catch((err) => {
+  logger.error({ err }, "Seeding failed");
   process.exit(1);
 });
