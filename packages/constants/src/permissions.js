@@ -299,6 +299,12 @@ const PERMISSIONS = exports.PERMISSIONS = [
   group: "Notification",
   description: "Manage notification settings"
 },
+// Public website CMS (content drafts, publishing, website inquiries)
+{
+  key: "cms.manage",
+  group: "CMS",
+  description: "Edit, preview and publish the public website; view website enquiries"
+},
 // Permissions themselves
 {
   key: "permission.manage",

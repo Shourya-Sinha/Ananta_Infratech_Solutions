@@ -350,6 +350,87 @@ from `.env`, default `9999999999` / `ChangeMe123!` — change this
 immediately in any real deployment) on the admin web app. The mobile app
 is for MANAGER/WORKER accounts only.
 
+## Public website + Website CMS (new)
+
+The repo now also contains the **public company website** (`apps/website`) and a
+**Website CMS** inside the admin panel (`/cms`), with live draft preview.
+
+### What the public site includes (`apps/website`, port 5174)
+
+| Page | Route |
+| --- | --- |
+| Home (hero, stats, intro, capabilities, featured projects, process, safety, testimonials, clients, news, CTA) | `/` |
+| About (story, mission, vision, values, milestones, leadership, compliance) | `/about` |
+| Services + one page per service | `/services`, `/services/:slug` |
+| Projects (category filter) + one page per project | `/projects`, `/projects/:slug` |
+| Health, safety & environment | `/safety` |
+| Clients & testimonials | `/clients` |
+| **Careers & registration** — separate *Register as a Contractor* and *Register as a Worker* cards, both marked **Application launching soon**, each with a "notify me when it opens" form | `/careers` |
+| News + articles | `/news`, `/news/:slug` |
+| FAQ (no-JS accordion) | `/faq` |
+| Contact form (service pre-selected from links) | `/contact` |
+| 404 | any other path |
+
+Layout includes a header with top bar and mobile menu, announcement bar, footer,
+and a floating WhatsApp button. Forms post to `POST /api/v1/public/inquiries`.
+
+### How content works
+
+- All editable text, images, projects, services, people and FAQs live in one
+  JSON document: `packages/cms-defaults/content.json`. This is the **fallback**
+  the site uses until someone publishes from the CMS, and the shape the API accepts.
+- The API stores a **draft** and a **published** copy (`SiteContent`, key `main`).
+  - `GET /api/v1/public/site` → published content (defaults if never published).
+  - `GET/PUT /api/v1/cms…`, `POST /api/v1/cms/publish`, `POST /api/v1/cms/discard`
+    → admin editor, protected by the new `cms.manage` permission (Super Admin has it
+    by default; grant it to other roles in Permissions).
+  - Links and image URLs are validated (only `/…`, `#…`, `https://`, `http://`,
+    `mailto:`, `tel:`), so `javascript:` URLs cannot be published.
+- Website enquiries (contact form, contractor and worker interest) are stored as
+  `WebsiteInquiry` documents and listed in **Website CMS → Website enquiries**,
+  where staff can mark them New / Contacted / Closed.
+
+### Using the CMS and preview
+
+1. Log in to the admin web app, open **Website → Website CMS**.
+2. Pick a section on the left (Company, Home, About, Services, Projects, Clients,
+   Testimonials, Safety, Careers, News, FAQ, Contact). Edit the fields. Lists have
+   Add / Up / Down / Remove, and "Generate slug from title" for URL slugs.
+3. The right-hand panel is a **live preview of the unsaved draft**. Pick any page
+   from its dropdown. Use the desktop / mobile toggle to check both layouts.
+4. **Save draft** keeps your work. **Publish to live site** makes it public.
+   **Discard draft** resets to the live version.
+
+The preview iframe finds the website automatically in local dev (port 5174). In
+production set `VITE_WEBSITE_PREVIEW_URL` for the admin app to the website's public
+URL, for example `VITE_WEBSITE_PREVIEW_URL=https://www.your-domain.com`.
+
+### Running it
+
+```bash
+npm run dev          # API + admin web + public website together
+npm run dev:website  # only the public website (http://localhost:5174)
+npm run build:website
+```
+
+The website proxies `/api` to the API server (`VITE_API_PROXY_TARGET`, default
+`http://localhost:4000`). If the API is down, the site still renders from the
+bundled defaults.
+
+### Before going live — replace the placeholders
+
+`packages/cms-defaults/content.json` ships with **sample content** so the site
+looks complete. Before launch, open the CMS and replace:
+
+- Company phone (`+91 00000 00000`), WhatsApp number, email (`info@example.com`),
+  office address, working hours, and social links.
+- Projects, testimonials, clients, news and FAQ text: these are examples, not real
+  case studies. Only publish testimonials you have permission to use.
+- Leadership: the two director names come from public company registry records
+  (Registrar of Companies, Delhi); confirm the names, roles and bios.
+- Images in `apps/website/public/images/` are AI-generated placeholders. Replace
+  them with real site photos via the image URL fields.
+
 ## Running tests
 
 ```bash

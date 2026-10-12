@@ -15,6 +15,7 @@ import {
   Package,
   Receipt,
   ScrollText,
+  Globe,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -67,6 +68,10 @@ const NAV_GROUPS = [
       { to: "/equipment", label: "Equipment & Tools", icon: Wrench },
       { to: "/site-diary", label: "Site Diary", icon: BookOpen }
     ]
+  },
+  {
+    label: "Website",
+    items: [{ to: "/cms", label: "Website CMS", icon: Globe }]
   },
   {
     label: "Requests",
