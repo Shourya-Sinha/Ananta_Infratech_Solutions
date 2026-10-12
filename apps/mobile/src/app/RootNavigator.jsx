@@ -52,7 +52,7 @@ export function RootNavigator() {
     <NavigationContainer>
       {!accessToken || !user ?
       <AuthNavigator /> :
-      user.role === "MANAGER" ?
+      (user.baseRole ?? user.role) === "MANAGER" ?
       <ManagerNavigator /> :
 
       <WorkerOnboardingGate />

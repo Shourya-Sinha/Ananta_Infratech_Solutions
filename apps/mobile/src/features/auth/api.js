@@ -12,14 +12,17 @@ export function useLogin() {
       return unwrap(api.post("/auth/login", { ...input, deviceId }));
     },
     onSuccess: async (data) => {
-      if (data.user.role !== "MANAGER" && data.user.role !== "WORKER") {
+      // Custom roles are routed by their base role (MANAGER / WORKER).
+      const base = data.user.baseRole ?? data.user.role;
+      if (base !== "MANAGER" && base !== "WORKER") {
         throw new Error("This app is for Managers and Workers. Use the Admin Web app instead.");
       }
       await setSession(data.accessToken, data.refreshToken, {
         id: data.user.id,
         name: data.user.name,
         phone: data.user.phone,
-        role: data.user.role
+        role: data.user.role,
+        baseRole: base
       });
     }
   });

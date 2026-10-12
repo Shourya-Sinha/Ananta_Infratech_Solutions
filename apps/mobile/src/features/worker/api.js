@@ -44,6 +44,19 @@ export function useMySalarySummary(workerId, month) {
   });
 }
 
+/**
+ * Live statement for the signed-in worker: earnings minus advances and
+ * kharchi for the calendar month. Works before payroll is calculated.
+ */
+export function useMyStatement(month) {
+  return useQuery({
+    queryKey: ["worker", "statement", month],
+    queryFn: async () => unwrap(api.get(`/salary/me/statement?month=${month}`)),
+    refetchInterval: 30_000,
+    staleTime: 10_000
+  });
+}
+
 export function useMyLedger(workerId) {
   return useQuery({
     queryKey: ["worker", "ledger", workerId],
@@ -82,7 +95,10 @@ export function useRequestAdvance() {
   return useMutation({
     mutationFn: async (input) =>
     unwrap(api.post("/advances", input)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["worker", "advances"] })
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["worker", "advances"] });
+      qc.invalidateQueries({ queryKey: ["worker", "statement"] });
+    }
   });
 }
 
@@ -92,6 +108,9 @@ export function useRequestKharchi() {
     mutationFn: async (input) =>
 
     unwrap(api.post("/kharchi", input)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["worker", "kharchi"] })
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["worker", "kharchi"] });
+      qc.invalidateQueries({ queryKey: ["worker", "statement"] });
+    }
   });
 }

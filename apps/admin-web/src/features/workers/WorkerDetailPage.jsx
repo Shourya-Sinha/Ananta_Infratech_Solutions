@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
 import { DirectAdvancePanel, DirectKharchiPanel } from "@/features/requests/DirectAddPanels";
 import { WorkerDocumentsCard } from "./WorkerDocumentsCard";
+import { LiveSalaryCard } from "./LiveSalaryCard";
 import { formatDate } from "@/lib/format";
 
 const STEPS = ["PENDING_VERIFICATION", "DOCUMENT_VERIFIED", "WORK_TYPE_VERIFIED", "ACTIVE"];
@@ -30,7 +31,7 @@ export function WorkerDetailPage() {
   const { data: workTypes } = useWorkTypes();
   const { data: assignments } = useAssignmentHistory(id);
   const user = useAuthStore((s) => s.user);
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const isSuperAdmin = (user?.baseRole ?? user?.role) === "SUPER_ADMIN";
   const toast = useToast();
   const [rejectReason, setRejectReason] = useState("");
   const [selectedSite, setSelectedSite] = useState("");
@@ -132,6 +133,8 @@ export function WorkerDetailPage() {
       )}
 
       <WorkerDocumentsCard workerId={worker._id} verificationStatus={worker.verificationStatus} />
+
+      <LiveSalaryCard workerId={worker._id} />
 
       {isSuperAdmin && (
         <div className="card p-4">

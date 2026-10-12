@@ -63,7 +63,7 @@ export function SitesListPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const user = useAuthStore((s) => s.user);
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const isSuperAdmin = (user?.baseRole ?? user?.role) === "SUPER_ADMIN";
 
   useSocketInvalidate("site:created", [["sites"]]);
   useSocketInvalidate("site:updated", [["sites"]]);

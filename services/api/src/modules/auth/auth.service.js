@@ -146,9 +146,11 @@ exports.AuthService = {
       userAgent: meta.userAgent
     });
     const roleKey = user.role.key;
+    const baseRole = user.role.baseRole ?? roleKey;
     const accessToken = _token.TokenService.signAccessToken({
       sub: user._id.toString(),
       role: roleKey,
+      baseRole,
       sessionId: sessionId.toString()
     });
     user.lastLoginAt = now;
@@ -168,7 +170,8 @@ exports.AuthService = {
         id: user._id.toString(),
         name: user.name,
         phone: user.phone,
-        role: roleKey
+        role: roleKey,
+        baseRole
       }
     };
   },
@@ -205,9 +208,11 @@ exports.AuthService = {
     session.lastActivityAt = new Date();
     await session.save();
     const roleKey = user.role.key;
+    const baseRole = user.role.baseRole ?? roleKey;
     const accessToken = _token.TokenService.signAccessToken({
       sub: user._id.toString(),
       role: roleKey,
+      baseRole,
       sessionId: session._id.toString()
     });
     return {

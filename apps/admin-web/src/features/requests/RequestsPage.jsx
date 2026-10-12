@@ -19,7 +19,7 @@ export function RequestsPage() {
   // All = every entry incl. Super Admin direct adds (APPROVED/PAID history).
   const [scope, setScope] = useState("REQUESTED");
   const user = useAuthStore((s) => s.user);
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const isSuperAdmin = (user?.baseRole ?? user?.role) === "SUPER_ADMIN";
   const qc = useQueryClient();
   const toast = useToast();
 

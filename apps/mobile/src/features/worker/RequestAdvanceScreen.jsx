@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { View, Text, ScrollView, StyleSheet, TextInput, Alert } from "react-native";
 import { Button, ScreenHeader, Card, Badge } from "@/components/ui";
-import { useMyProfile, useMyAdvances, useRequestAdvance } from "./api";
+import { useMyProfile, useMyAdvances, useRequestAdvance, useMyStatement } from "./api";
+import { NetPreview } from "./NetPreview";
+import { currentMonthKey, toRupeeView } from "@/lib/salaryDisplay";
 import { colors, spacing } from "@/theme";
 
 function formatINR(n) {
@@ -14,6 +16,8 @@ export function RequestAdvanceScreen() {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const request = useRequestAdvance();
+  const { data: statement } = useMyStatement(currentMonthKey());
+  const currentNet = toRupeeView(statement)?.net;
 
   const submit = async () => {
     if (!profile || !amount || !reason) {
@@ -45,6 +49,8 @@ export function RequestAdvanceScreen() {
         <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="e.g. Family medical expense" />
         <Button title={request.isPending ? "Submitting…" : "Submit request"} onPress={submit} variant="accent" />
       </Card>
+
+      <NetPreview currentNet={currentNet} amountRupees={amount} kind="advance" />
 
       <Text style={styles.sectionLabel}>Your requests</Text>
       {advances?.map((a) =>
