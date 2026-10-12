@@ -1,6 +1,0 @@
-{
-  "name": "@ananta/cms-defaults",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Default public-website content. Used as the fallback when no content has been published from the admin CMS yet."
-}

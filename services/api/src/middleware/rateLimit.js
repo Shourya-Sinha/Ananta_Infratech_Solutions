@@ -43,17 +43,3 @@ const generalApiRateLimit = exports.generalApiRateLimit = (0, _expressRateLimit.
     }
   }
 });
-// Public website forms (contact / careers interest). Unauthenticated, so keep it tight.
-exports.inquiryRateLimit = (0, _expressRateLimit.default)({
-  windowMs: 10 * 60 * 1000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: {
-      code: "RATE_LIMITED",
-      message: "Too many submissions. Please try again later."
-    }
-  }
-});

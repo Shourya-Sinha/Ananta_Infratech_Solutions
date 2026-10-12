@@ -10,7 +10,6 @@
     "lint": "eslint src --ext .js,.jsx"
   },
   "dependencies": {
-    "@ananta/cms-defaults": "*",
     "@ananta/shared-types": "*",
     "@ananta/validation": "*",
     "@tanstack/react-query": "^5.51.0",
