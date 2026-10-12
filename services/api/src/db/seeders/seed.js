@@ -26,7 +26,7 @@ async function seedRoles() {
   for (const key of ROLE_KEYS) {
     const role = await Role.findOneAndUpdate(
       { key },
-      { key, label: ROLE_LABELS[key], isSystemRole: true },
+      { key, label: ROLE_LABELS[key], baseRole: key, isSystemRole: true },
       { upsert: true, new: true }
     );
     roleDocs.set(key, role);

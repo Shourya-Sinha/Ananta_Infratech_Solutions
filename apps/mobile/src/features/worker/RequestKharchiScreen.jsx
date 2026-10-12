@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { View, Text, ScrollView, StyleSheet, TextInput, Alert } from "react-native";
 import { Button, ScreenHeader, Card, Badge } from "@/components/ui";
-import { useMyProfile, useMyKharchi, useRequestKharchi } from "./api";
+import { useMyProfile, useMyKharchi, useRequestKharchi, useMyStatement } from "./api";
+import { NetPreview } from "./NetPreview";
+import { currentMonthKey, toRupeeView } from "@/lib/salaryDisplay";
 import { colors, spacing } from "@/theme";
 
 const CATEGORIES = ["Food", "Transport", "Tools", "Medical", "Other"];
@@ -14,6 +16,8 @@ export function RequestKharchiScreen() {
   const { data: profile } = useMyProfile();
   const { data: kharchi } = useMyKharchi(profile?._id);
   const [amount, setAmount] = useState("");
+  const { data: statement } = useMyStatement(currentMonthKey());
+  const currentNet = toRupeeView(statement)?.net;
   const [category, setCategory] = useState("");
   const [reason, setReason] = useState("");
   const request = useRequestKharchi();
@@ -59,6 +63,8 @@ export function RequestKharchiScreen() {
         <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="e.g. Tools purchase" />
         <Button title={request.isPending ? "Submitting…" : "Submit request"} onPress={submit} variant="accent" />
       </Card>
+
+      <NetPreview currentNet={currentNet} amountRupees={amount} kind="kharchi" />
 
       <Text style={styles.sectionLabel}>Your requests</Text>
       {kharchi?.map((k) =>

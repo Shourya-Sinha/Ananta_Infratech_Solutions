@@ -19,7 +19,7 @@ export function WorkersListPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const user = useAuthStore((s) => s.user);
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const isSuperAdmin = (user?.baseRole ?? user?.role) === "SUPER_ADMIN";
   // Reads ?status=ACTIVE etc from the URL so dashboard KPI cards can deep-link
   // straight into a pre-filtered view instead of a generic list.
   const [status, setStatus] = useState(searchParams.get("status") ?? "");

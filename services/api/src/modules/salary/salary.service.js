@@ -8,6 +8,8 @@ var _MonthlyPayroll = require("../../db/models/MonthlyPayroll");
 var _Attendance = require("../../db/models/Attendance");
 var _salaryRule = require("./salaryRule.service");
 var _utils = require("@ananta/utils");
+var _statement = require("./statement");
+var _Requests = require("../../db/models/Requests");
 var _AppError = require("../../errors/AppError");
 function toPaiseNumber(decimal) {
   return Number(decimal.toString());
@@ -230,6 +232,59 @@ exports.SalaryService = {
     return _SalaryLedger.SalaryLedger.find(query).sort({
       date: 1,
       createdAt: 1
+    });
+  },
+  /**
+   * Live salary statement for one worker and calendar month. Unlike the
+   * payroll summary this does NOT require payroll to be calculated — it reads
+   * the ledger directly, so every advance/kharchi that is paid or approved
+   * is reflected the moment it is posted.
+   */
+  async getStatement(workerId, month) {
+    const {
+      from,
+      to
+    } = (0, _statement.monthBounds)(month);
+    const rows = await _SalaryLedger.SalaryLedger.find({
+      worker: workerId,
+      date: {
+        $gte: from,
+        $lte: to
+      }
+    }).sort({
+      date: 1,
+      createdAt: 1
+    });
+    const entries = rows.map(e => ({
+      id: e._id.toString(),
+      date: e.date,
+      type: e.type,
+      description: e.description,
+      creditPaise: toPaiseNumber(e.creditPaise),
+      debitPaise: toPaiseNumber(e.debitPaise),
+      runningBalancePaise: e.runningBalancePaise == null ? null : toPaiseNumber(e.runningBalancePaise)
+    }));
+    const [attendance, payroll, advances, kharchi] = await Promise.all([this.getAttendanceSummary(workerId, month), _MonthlyPayroll.MonthlyPayroll.findOne({
+      worker: workerId,
+      month
+    }).select("status"), _Requests.AdvanceRequest.find({
+      worker: workerId,
+      status: {
+        $in: ["REQUESTED", "APPROVED"]
+      }
+    }).select("amountPaise approvedAmountPaise"), _Requests.KharchiRequest.find({
+      worker: workerId,
+      status: "REQUESTED"
+    }).select("amountPaise")]);
+    const pendingAdvancePaise = advances.reduce((sum, a) => sum + (a.approvedAmountPaise ?? toPaiseNumber(a.amountPaise)), 0);
+    const pendingKharchiPaise = kharchi.reduce((sum, k) => sum + toPaiseNumber(k.amountPaise), 0);
+    return (0, _statement.buildStatement)({
+      month,
+      entries,
+      attendance,
+      pendingAdvancePaise,
+      pendingKharchiPaise,
+      payrollStatus: payroll?.status ?? null
     });
   },
   /**

@@ -7,7 +7,25 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/Toast";
 import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
 
-const ROLE_OPTIONS = ["", "SUPER_ADMIN", "MANAGER", "WORKER"];
+const BUILT_IN_ROLES = [
+  { key: "SUPER_ADMIN", label: "Super Admin" },
+  { key: "MANAGER", label: "Manager" },
+  { key: "WORKER", label: "Worker" },
+];
+
+/**
+ * Every role the admin can assign, including custom roles. Falls back to the
+ * built-ins when the viewer lacks permission.manage (the roles API is gated).
+ */
+function useRoleOptions() {
+  const { data } = useQuery({
+    queryKey: ["roles"],
+    queryFn: async () => unwrap(api.get("/roles")),
+    retry: false,
+    staleTime: 60_000,
+  });
+  return data?.length ? data.map((r) => ({ key: r.key, label: r.label, isSystemRole: r.isSystemRole })) : BUILT_IN_ROLES;
+}
 const STATUS_OPTIONS = ["", "ACTIVE", "SUSPENDED", "PENDING_VERIFICATION"];
 
 function useUsers({ search, role, status, page, pageSize }) {
@@ -33,6 +51,7 @@ export function UsersPage() {
   const pageSize = 20;
 
   const { data, isLoading } = useUsers({ search, role, status, page, pageSize });
+  const roleOptions = useRoleOptions();
   useSocketInvalidate("user:created", [["users"]]);
   useSocketInvalidate("user:updated", [["users"]]);
   useSocketInvalidate("user:status_changed", [["users"]]);
@@ -41,7 +60,7 @@ export function UsersPage() {
   const [form, setForm] = useState({ name: "", phone: "", email: "", roleKey: "MANAGER" });
   const [createdResult, setCreatedResult] = useState(null);
   const [editing, setEditing] = useState(null);
-  const [editForm, setEditForm] = useState({ name: "", email: "" });
+  const [editForm, setEditForm] = useState({ name: "", email: "", roleKey: "" });
 
   const create = useMutation({
     mutationFn: async (input) => unwrap(api.post("/users", input)),
@@ -84,7 +103,7 @@ export function UsersPage() {
 
   const startEdit = (u) => {
     setEditing(u._id);
-    setEditForm({ name: u.name ?? "", email: u.email ?? "" });
+    setEditForm({ name: u.name ?? "", email: u.email ?? "", roleKey: u.role?.key ?? "" });
   };
 
   const columns = [
@@ -251,9 +270,11 @@ export function UsersPage() {
               value={form.roleKey}
               onChange={(e) => setForm({ ...form, roleKey: e.target.value })}
             >
-              <option value="MANAGER">MANAGER</option>
-              <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-              <option value="WORKER">WORKER</option>
+              {roleOptions.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.label} ({r.key})
+                </option>
+              ))}
             </select>
           </div>
           <div className="md:col-span-4">
@@ -272,6 +293,16 @@ export function UsersPage() {
             <input className="input" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
           </div>
           <div>
+            <label className="mb-1 block text-xs text-graphite-500">Role</label>
+            <select className="input" value={editForm.roleKey} onChange={(e) => setEditForm({ ...editForm, roleKey: e.target.value })}>
+              {roleOptions.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.label} ({r.key})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="mb-1 block text-xs text-graphite-500">Email</label>
             <input
               className="input"
@@ -282,7 +313,18 @@ export function UsersPage() {
           </div>
           <button
             className="btn-primary"
-            onClick={() => update.mutate({ id: editing, payload: { name: editForm.name.trim(), email: editForm.email.trim() || undefined } })}
+            onClick={() => {
+              const current = data?.items?.find((u) => u._id === editing);
+              const roleChanged = editForm.roleKey && editForm.roleKey !== current?.role?.key;
+              update.mutate({
+                id: editing,
+                payload: {
+                  name: editForm.name.trim(),
+                  email: editForm.email.trim() || undefined,
+                  ...(roleChanged ? { roleKey: editForm.roleKey } : {}),
+                },
+              });
+            }}
             disabled={update.isPending}
           >
             Save
@@ -314,9 +356,10 @@ export function UsersPage() {
             setPage(1);
           }}
         >
-          {ROLE_OPTIONS.map((r) => (
-            <option key={r} value={r}>
-              {r || "All roles"}
+          <option value="">All roles</option>
+          {roleOptions.map((r) => (
+            <option key={r.key} value={r.key}>
+              {r.label}
             </option>
           ))}
         </select>

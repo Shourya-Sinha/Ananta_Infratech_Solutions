@@ -28,9 +28,13 @@ async function authenticate(req, _res, next) {
     if (!session || session.revoked) {
       throw _AppError.AppError.unauthorized("Session no longer valid. Please log in again.");
     }
+    // `role` is the BASE role (SUPER_ADMIN / MANAGER / WORKER) and drives
+    // record-level scope checks everywhere. `roleKey` is the actual role
+    // (possibly a custom one) and is what permission lookups use.
     req.auth = {
       userId: payload.sub,
-      role: payload.role,
+      role: payload.baseRole ?? payload.role,
+      roleKey: payload.role,
       sessionId: payload.sessionId,
       permissions: new Set()
     };

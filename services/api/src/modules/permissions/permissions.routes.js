@@ -71,6 +71,18 @@ permissionsRouter.patch("/role/:roleId", (0, _rbac.requirePermission)("permissio
     updates
   } = updateRolePermissionsSchema.parse(req.body);
   const actorId = req.auth.userId;
+  // Escalation guard: you can only grant permissions you hold yourself, and
+  // only a Super Admin can edit a role whose base is SUPER_ADMIN.
+  const isSuperAdmin = req.auth.role === "SUPER_ADMIN";
+  if (!isSuperAdmin && (role.baseRole ?? role.key) === "SUPER_ADMIN") {
+    throw _AppError.AppError.forbidden("Only a Super Admin can change Super Admin-level roles.");
+  }
+  if (!isSuperAdmin) {
+    const notHeld = updates.filter(u => u.enabled && !req.auth.permissions.has(u.permissionKey)).map(u => u.permissionKey);
+    if (notHeld.length) {
+      throw _AppError.AppError.forbidden(`You cannot grant permissions you do not have: ${notHeld.join(", ")}`);
+    }
+  }
   for (const u of updates) {
     await _permission.PermissionService.setRolePermission(role.key, u.permissionKey, u.enabled, actorId);
   }

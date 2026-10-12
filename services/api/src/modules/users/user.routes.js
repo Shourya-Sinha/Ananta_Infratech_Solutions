@@ -7,6 +7,7 @@ var _zod = require("zod");
 var _user = require("./user.service");
 var _authenticate = require("../../middleware/authenticate");
 var _rbac = require("../../middleware/rbac");
+var _role = require("../permissions/role.service");
 var _errorHandler = require("../../middleware/errorHandler");
 var _validation = require("@ananta/validation");
 var _sharedTypes = require("@ananta/shared-types");
@@ -15,7 +16,7 @@ const usersRouter = exports.usersRouter = (0, _express.Router)();
 usersRouter.use(_authenticate.authenticate);
 usersRouter.get("/", (0, _rbac.requirePermission)("user.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   const query = _zod.z.object({
-    role: _zod.z.enum(_sharedTypes.ROLE_KEYS).optional(),
+    role: _zod.z.string().trim().min(3).max(40).optional(),
     status: _zod.z.enum(_sharedTypes.USER_STATUS).optional(),
     search: _zod.z.string().optional(),
     page: _zod.z.coerce.number().optional(),
@@ -40,11 +41,14 @@ const createUserSchema = _zod.z.object({
   name: _zod.z.string().trim().min(2).max(120),
   phone: _validation.phoneSchema,
   email: _zod.z.string().trim().email().optional(),
-  roleKey: _zod.z.enum(_sharedTypes.ROLE_KEYS)
+  roleKey: _zod.z.string().trim().min(3).max(40)
 });
 usersRouter.post("/", (0, _rbac.requirePermission)("user.create"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   const input = createUserSchema.parse(req.body);
-  const result = await _user.UserService.create(input, req.auth.userId);
+  const result = await _user.UserService.create({
+    ...input,
+    actorIsSuperAdmin: req.auth.role === "SUPER_ADMIN"
+  }, req.auth.userId);
   (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).emit(_sharedTypes.SOCKET_EVENTS.USER_CREATED, {
     userId: result.user._id.toString()
   });
@@ -56,11 +60,25 @@ usersRouter.post("/", (0, _rbac.requirePermission)("user.create"), (0, _errorHan
 }));
 const updateUserSchema = _zod.z.object({
   name: _zod.z.string().trim().min(2).max(120).optional(),
-  email: _zod.z.string().trim().email().optional()
+  email: _zod.z.string().trim().email().optional(),
+  roleKey: _zod.z.string().trim().min(3).max(40).optional()
 });
 usersRouter.patch("/:id", (0, _rbac.requirePermission)("user.update"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   const input = updateUserSchema.parse(req.body);
-  const user = await _user.UserService.update(req.params.id, input, req.auth.userId);
+  const {
+    roleKey,
+    ...profileUpdates
+  } = input;
+  if (roleKey !== undefined) {
+    // Role changes go through the guarded RBAC path (escalation checks,
+    // last-super-admin protection, session revocation).
+    await _role.RoleService.assignToUser(req.params.id, roleKey, {
+      userId: req.auth.userId,
+      baseRole: req.auth.role,
+      permissions: req.auth.permissions
+    });
+  }
+  const user = await _user.UserService.update(req.params.id, profileUpdates, req.auth.userId);
   (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).emit(_sharedTypes.SOCKET_EVENTS.USER_UPDATED, {
     userId: user._id.toString()
   });

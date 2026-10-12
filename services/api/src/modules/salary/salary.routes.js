@@ -5,6 +5,7 @@ exports.salaryRouter = exports.payrollRouter = void 0;
 var _express = require("express");
 var _zod = require("zod");
 var _salary = require("./salary.service");
+var _statement = require("./statement");
 var _payroll = require("../payroll/payroll.service");
 var _WorkerProfile = require("../../db/models/WorkerProfile");
 var _authenticate = require("../../middleware/authenticate");
@@ -96,6 +97,55 @@ salaryRouter.get("/worker/:id/summary", (0, _errorHandler.asyncHandler)(async (r
     data
   };
   res.json(body);
+}));
+/**
+ * Record-level access for a worker's salary data: a WORKER base may only see
+ * their own profile; everyone else needs salary.read.
+ */
+async function assertCanViewWorkerSalary(req, workerId, message) {
+  const {
+    role,
+    userId,
+    permissions
+  } = req.auth;
+  if (role === "WORKER") {
+    const profile = await _WorkerProfile.WorkerProfile.findOne({
+      user: userId
+    });
+    if (!profile || profile._id.toString() !== workerId) throw _AppError.AppError.forbidden(message);
+  } else if (!permissions.has("salary.read")) {
+    throw _AppError.AppError.forbidden();
+  }
+}
+const statementQuery = _zod.z.object({
+  month: _zod.z.string().regex(/^\d{4}-\d{2}$/, "month must be YYYY-MM").optional()
+});
+salaryRouter.get("/worker/:id/statement", (0, _errorHandler.asyncHandler)(async (req, res) => {
+  await assertCanViewWorkerSalary(req, req.params.id, "You can only view your own salary statement.");
+  const {
+    month
+  } = statementQuery.parse(req.query);
+  const data = await _salary.SalaryService.getStatement(req.params.id, month ?? (0, _statement.currentMonthIST)());
+  res.json({
+    success: true,
+    data
+  });
+}));
+
+// Convenience for the worker app: resolves the caller's own worker profile.
+salaryRouter.get("/me/statement", (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const profile = await _WorkerProfile.WorkerProfile.findOne({
+    user: req.auth.userId
+  }).select("_id");
+  if (!profile) throw _AppError.AppError.notFound("No worker profile for this account.");
+  const {
+    month
+  } = statementQuery.parse(req.query);
+  const data = await _salary.SalaryService.getStatement(profile._id.toString(), month ?? (0, _statement.currentMonthIST)());
+  res.json({
+    success: true,
+    data
+  });
 }));
 const payrollRouter = exports.payrollRouter = (0, _express.Router)();
 payrollRouter.use(_authenticate.authenticate);

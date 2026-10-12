@@ -16,7 +16,7 @@ function requirePermission(permissionKey) {
   return async (req, _res, next) => {
     try {
       if (!req.auth) throw _AppError.AppError.unauthorized();
-      const permissions = await _permission.PermissionService.getPermissionsForRole(req.auth.role);
+      const permissions = await _permission.PermissionService.getPermissionsForRole(req.auth.roleKey ?? req.auth.role);
       req.auth.permissions = permissions;
       if (!permissions.has(permissionKey)) {
         throw _AppError.AppError.forbidden("You don't have permission to perform this action. Please contact your administrator.");
@@ -33,7 +33,7 @@ function requireAnyPermission(...permissionKeys) {
   return async (req, _res, next) => {
     try {
       if (!req.auth) throw _AppError.AppError.unauthorized();
-      const permissions = await _permission.PermissionService.getPermissionsForRole(req.auth.role);
+      const permissions = await _permission.PermissionService.getPermissionsForRole(req.auth.roleKey ?? req.auth.role);
       req.auth.permissions = permissions;
       const allowed = permissionKeys.some(k => permissions.has(k));
       if (!allowed) {

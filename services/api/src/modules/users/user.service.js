@@ -38,7 +38,7 @@ exports.UserService = {
         }
       }];
     }
-    const [items, total] = await Promise.all([_User.User.find(filter).populate("role", "key label").sort({
+    const [items, total] = await Promise.all([_User.User.find(filter).populate("role", "key label baseRole").sort({
       createdAt: -1
     }).skip((page - 1) * pageSize).limit(pageSize), _User.User.countDocuments(filter)]);
     return {
@@ -50,7 +50,7 @@ exports.UserService = {
     };
   },
   async getById(userId) {
-    const user = await _User.User.findById(userId).populate("role", "key label");
+    const user = await _User.User.findById(userId).populate("role", "key label baseRole");
     if (!user) throw _AppError.AppError.notFound("User not found");
     return user;
   },
@@ -61,9 +61,12 @@ exports.UserService = {
     });
     if (existing) throw _AppError.AppError.conflict("A user with this phone number already exists.");
     const role = await _Role.Role.findOne({
-      key: input.roleKey
+      key: input.roleKey.toUpperCase()
     });
     if (!role) throw _AppError.AppError.validation(`Unknown role: ${input.roleKey}`);
+    if (role.baseRole === "SUPER_ADMIN" && !input.actorIsSuperAdmin) {
+      throw _AppError.AppError.forbidden("Only a Super Admin can create Super Admin-level accounts.");
+    }
     // The creating admin may choose the initial password (e.g. worker
     // registration via the Admin Web UI where the credentials are handed
     // over in person); when omitted a random one is generated and returned
