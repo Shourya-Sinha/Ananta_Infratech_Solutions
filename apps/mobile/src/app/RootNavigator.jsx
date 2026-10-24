@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { AuthNavigator } from "./AuthNavigator";
 import { ManagerNavigator } from "./ManagerNavigator";
+import { AdminNavigator } from "./AdminNavigator";
 import { WorkerOnboardingGate } from "./WorkerOnboardingGate";
 import { OfflineAttendanceQueue } from "@/offline/attendanceQueue";
 import { registerForPushNotifications, subscribeToForegroundMessages } from "@/lib/pushNotifications";
@@ -52,6 +53,9 @@ export function RootNavigator() {
     <NavigationContainer>
       {!accessToken || !user ?
       <AuthNavigator /> :
+      (user.baseRole ?? user.role) === "SUPER_ADMIN" ?
+      // Admin: full mobile admin (any site) — never the worker flow.
+      <AdminNavigator /> :
       (user.baseRole ?? user.role) === "MANAGER" ?
       <ManagerNavigator /> :
 

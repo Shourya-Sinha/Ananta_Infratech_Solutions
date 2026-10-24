@@ -70,7 +70,10 @@ exports.AdvanceService = {
         siteId,
         type: "ADVANCE_DEDUCTION",
         amountPaise,
-        date: request.requestedDate,
+        // Deduct in the month the money is actually PAID, not the month it
+        // was requested — otherwise last month's (possibly finalized)
+        // payroll silently absorbs this month's advance.
+        date: new Date(),
         description: `Advance payout (added by Super Admin) — ${input.reason}`,
         reference: request._id.toString(),
         actorId: input.actorId
@@ -193,7 +196,7 @@ exports.AdvanceService = {
       siteId: resolvedSiteId,
       type: "ADVANCE_DEDUCTION",
       amountPaise: request.approvedAmountPaise ?? request.amountPaise,
-      date: request.requestedDate,
+      date: new Date(),
       description: `Advance payout — ${request.reason}`,
       reference: request._id.toString(),
       actorId: paidBy

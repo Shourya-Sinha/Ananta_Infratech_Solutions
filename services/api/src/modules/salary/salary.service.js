@@ -41,13 +41,31 @@ exports.SalaryService = {
       };
     }
     const rules = await _salaryRule.SalaryRuleService.getActiveRuleSet();
-    const totalHours = attendance.status === "LEAVE_PAID" ? rules.fullDayHours // paid leave credited as a full day
-    : (attendance.hoursWorked ?? 0) + (attendance.overtimeHours ?? 0);
+    // Per-worker rate wins over the work-type default. The admin/manager may
+    // have set it per-hour, per-day or per-month — deriveSalaryRates converts
+    // all three bases to the one daily rate the engine needs.
+    const rates = (0, _utils.deriveSalaryRates)({
+      salaryMode: profile.salaryMode,
+      hourlyRatePaise: profile.hourlyRatePaise,
+      dailyRatePaise: profile.dailyRatePaise,
+      monthlySalaryPaise: profile.monthlySalaryPaise,
+      fallbackDailyRatePaise: workType.defaultDailyRatePaise
+    }, rules);
+    if (!rates.dailyRatePaise) throw _AppError.AppError.validation("No salary rate set for this worker or their work type.");
+    // Hours actually worked. A PRESENT mark with no hours recorded means a
+    // full day (managers often just tap "present") and HALF_DAY with no
+    // hours means half a day — previously both silently earned ₹0.
+    let workedHours = (attendance.hoursWorked ?? 0) + (attendance.overtimeHours ?? 0);
+    if (attendance.status === "LEAVE_PAID") workedHours = rules.fullDayHours; // paid leave credited as a full day
+    else if (attendance.status === "PRESENT" && workedHours === 0) workedHours = rules.fullDayHours;
+    else if (attendance.status === "HALF_DAY" && workedHours === 0) workedHours = rules.fullDayHours / 2;
+    const totalHours = workedHours;
     const result = (0, _utils.calculateDailyEarning)({
-      dailyRatePaise: workType.defaultDailyRatePaise,
+      dailyRatePaise: rates.dailyRatePaise,
       hoursWorked: totalHours,
       rules
     });
+    result.salaryRates = rates;
     const entries = [{
       type: "EARNING",
       amount: result.regularEarningPaise,
@@ -129,7 +147,10 @@ exports.SalaryService = {
         description: params?.description ?? `Reversal of ${entry.type.toLowerCase()} for deleted/edited attendance`,
         creditPaise: "0",
         debitPaise: outstanding.toString(),
-        runningBalancePaise: runningBalance.toString(),
+        // BUG FIX: this previously stored the PRE-reversal balance, so the
+        // worker's running balance never went down after a correction/delete
+        // even though the month rollup did — ledger and payroll disagreed.
+        runningBalancePaise: (runningBalance - outstanding).toString(),
         reference: entry.reference,
         createdBy: params?.actorId ?? entry.createdBy
       });
@@ -202,15 +223,36 @@ exports.SalaryService = {
   },
   async postDeduction(params) {
     const workerObjectId = new _mongoose.Types.ObjectId(params.workerId);
+    // Idempotency: one deduction per source request. A retried approve/pay
+    // call (double tap, network retry) must never deduct the same advance
+    // or Kharchi twice from the worker's salary.
+    if (params.reference) {
+      const existing = await _SalaryLedger.SalaryLedger.findOne({
+        reference: params.reference,
+        type: params.type
+      });
+      if (existing) return existing;
+    }
+    let deductionDate = params.date ? new Date(params.date) : new Date();
+    // Month attribution: a deduction belongs to the month it is PAID in.
+    // If the target month's payroll is already FINALIZED/PAID, posting there
+    // would silently change a locked month (the rollup refuses to recalc) —
+    // carry the deduction into the current, still-open month instead.
+    const targetMonth = `${deductionDate.getUTCFullYear()}-${String(deductionDate.getUTCMonth() + 1).padStart(2, "0")}`;
+    const lockedPayroll = await _MonthlyPayroll.MonthlyPayroll.findOne({
+      worker: workerObjectId,
+      month: targetMonth,
+      status: {
+        $in: ["FINALIZED", "PAID"]
+      }
+    }).select("_id");
+    if (lockedPayroll) deductionDate = new Date();
     let runningBalance = await getLastRunningBalance(workerObjectId);
     runningBalance -= params.amountPaise;
     return _SalaryLedger.SalaryLedger.create({
       worker: workerObjectId,
       site: params.siteId,
-      // A direct advance/Kharchi can be entered for a specific calendar day.
-      // Preserve that day in the ledger so monthly/site finance filters do not
-      // silently move the expense to the admin's request time.
-      date: params.date ? new Date(params.date) : new Date(),
+      date: deductionDate,
       type: params.type,
       description: params.description,
       creditPaise: "0",
@@ -218,7 +260,93 @@ exports.SalaryService = {
       runningBalancePaise: runningBalance.toString(),
       reference: params.reference,
       createdBy: params.actorId
+    }).then(async (entry) => {
+      // Keep the monthly rollup in step with the live ledger so Admin
+      // payroll, worker statement and site finance never tell three
+      // different stories. Failure (e.g. month just finalized) must not
+      // fail the deduction itself — calculateMonth can rebuild it later.
+      const m = `${deductionDate.getUTCFullYear()}-${String(deductionDate.getUTCMonth() + 1).padStart(2, "0")}`;
+      await exports.SalaryService.recalculateMonth(workerObjectId.toString(), m).catch(() => {});
+      return entry;
     });
+  },
+  /**
+   * Salary preview for worker / manager / admin: the worker's derived rates,
+   * what they earned TODAY, what they have earned this month so far, and the
+   * approximate full-month salary if they work the remaining working days.
+   * expectedMonthlyNet uses deductions posted so far (pending requests are
+   * reported separately, matching the live statement).
+   */
+  async getSalaryPreview(workerId, month) {
+    const profile = await _WorkerProfile.WorkerProfile.findById(workerId).populate("workType");
+    if (!profile) throw _AppError.AppError.notFound("Worker not found");
+    const rules = await _salaryRule.SalaryRuleService.getActiveRuleSet();
+    const rates = (0, _utils.deriveSalaryRates)({
+      salaryMode: profile.salaryMode,
+      hourlyRatePaise: profile.hourlyRatePaise,
+      dailyRatePaise: profile.dailyRatePaise,
+      monthlySalaryPaise: profile.monthlySalaryPaise,
+      fallbackDailyRatePaise: profile.workType?.defaultDailyRatePaise
+    }, rules);
+    const statement = await this.getStatement(workerId, month);
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const today = statement.daily.find((d) => d.date === todayKey);
+    const workedDays = statement.attendance.presentDays + statement.attendance.paidLeaveDays + statement.attendance.halfDays * 0.5;
+    const remainingDays = Math.max(0, rates.workingDaysPerMonth - workedDays);
+    const expectedGrossPaise = (0, _utils.expectedMonthlyGrossPaise)(rates);
+    const projectedGrossPaise = statement.totals.totalEarningsPaise + Math.round(rates.dailyRatePaise * remainingDays);
+    // For a MONTHLY-salaried worker the full-month expectation is the fixed
+    // monthly salary itself; for hourly/daily it is rate × working days.
+    const approximateMonthlyGrossPaise = profile.salaryMode === "MONTHLY" && profile.monthlySalaryPaise > 0 ? profile.monthlySalaryPaise : expectedGrossPaise;
+    return {
+      workerId: workerId.toString(),
+      month,
+      rates: {
+        mode: profile.salaryMode ?? (rates.source === "WORK_TYPE_DEFAULT" ? "WORK_TYPE_DEFAULT" : "DAILY"),
+        source: rates.source,
+        hourlyRatePaise: rates.hourlyRatePaise,
+        dailyRatePaise: rates.dailyRatePaise,
+        monthlySalaryPaise: rates.monthlySalaryPaise,
+        fullDayHours: rates.fullDayHours,
+        workingDaysPerMonth: rates.workingDaysPerMonth
+      },
+      today: {
+        date: todayKey,
+        earnedPaise: today?.earningsPaise ?? 0,
+        deductionsPaise: today?.deductionsPaise ?? 0,
+        netPaise: today?.netPaise ?? 0
+      },
+      monthSoFar: statement.totals,
+      attendance: statement.attendance,
+      approximateMonthlyGrossPaise,
+      projectedGrossPaise,
+      approximateMonthlyNetPaise: Math.max(0, (profile.salaryMode === "MONTHLY" ? approximateMonthlyGrossPaise : projectedGrossPaise) - statement.totals.advanceDeductionsPaise - statement.totals.kharchiDeductionsPaise - statement.totals.otherDeductionsPaise),
+      pending: statement.pending,
+      payrollStatus: statement.payrollStatus
+    };
+  },
+  /**
+   * Sets a worker's individual pay rate from ONE basis (hourly, daily or
+   * monthly rupees). Only the chosen basis is stored; the other two are
+   * derived on every read. Past ledger entries are NOT rewritten.
+   */
+  async setWorkerSalaryRate(workerId, input, actorId) {
+    const profile = await _WorkerProfile.WorkerProfile.findById(workerId);
+    if (!profile) throw _AppError.AppError.notFound("Worker not found");
+    profile.salaryMode = input.mode;
+    profile.hourlyRatePaise = input.mode === "HOURLY" ? (0, _utils.rupeesToPaise)(input.amountRupees) : undefined;
+    profile.dailyRatePaise = input.mode === "DAILY" ? (0, _utils.rupeesToPaise)(input.amountRupees) : undefined;
+    profile.monthlySalaryPaise = input.mode === "MONTHLY" ? (0, _utils.rupeesToPaise)(input.amountRupees) : undefined;
+    profile.salaryRateUpdatedBy = actorId;
+    profile.salaryRateUpdatedAt = new Date();
+    await profile.save();
+    const rules = await _salaryRule.SalaryRuleService.getActiveRuleSet();
+    return (0, _utils.deriveSalaryRates)({
+      salaryMode: profile.salaryMode,
+      hourlyRatePaise: profile.hourlyRatePaise,
+      dailyRatePaise: profile.dailyRatePaise,
+      monthlySalaryPaise: profile.monthlySalaryPaise
+    }, rules);
   },
   async getLedger(workerId, from, to) {
     const query = {
@@ -326,8 +454,22 @@ exports.SalaryService = {
         case "KHARCHI_DEDUCTION":
           kharchiDeductionsPaise = (0, _utils.addPaise)(kharchiDeductionsPaise, debit);
           break;
-        case "ADJUSTMENT":
         case "REVERSAL":
+          // A reversal cancels an earning that was already counted in gross
+          // (same attendance, corrected/deleted). Netting it against gross —
+          // instead of inflating "other deductions" — keeps the payroll sheet
+          // honest: gross shows what the CURRENT attendance actually earned.
+          // The reversal's original split (regular vs OT) is not stored, so
+          // it is netted from gross first, then overtime.
+          {
+            let remaining = Math.max(0, debit - credit);
+            const fromGross = Math.min(grossEarningsPaise, remaining);
+            grossEarningsPaise -= fromGross;
+            remaining -= fromGross;
+            overtimeEarningsPaise = Math.max(0, overtimeEarningsPaise - remaining);
+          }
+          break;
+        case "ADJUSTMENT":
           otherDeductionsPaise = (0, _utils.addPaise)(otherDeductionsPaise, debit - credit >= 0 ? debit - credit : 0);
           break;
       }

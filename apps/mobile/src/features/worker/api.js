@@ -114,3 +114,20 @@ export function useRequestKharchi() {
     }
   });
 }
+/** Own salary preview: per-hour/day/month rates, today's earning, approx monthly salary. */
+export function useMySalaryPreview(month) {
+  return useQuery({
+    queryKey: ["worker", "salary-preview", month],
+    queryFn: async () => unwrap(api.get(`/salary/me/preview?month=${month}`)),
+    refetchInterval: 30_000,
+    staleTime: 10_000
+  });
+}
+
+/** Salary payment receipts (UPI/bank proof) uploaded by Admin — proof of payment. */
+export function useMyReceipts() {
+  return useQuery({
+    queryKey: ["worker", "receipts"],
+    queryFn: async () => unwrap(api.get("/salary/me/receipts"))
+  });
+}

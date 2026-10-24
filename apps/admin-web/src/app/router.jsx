@@ -21,6 +21,7 @@ import { SuppliersPage } from "@/features/suppliers/SuppliersPage";
 import { MaterialsPage } from "@/features/materials/MaterialsPage";
 import { EquipmentPage } from "@/features/equipment/EquipmentPage";
 import { SiteDiaryPage } from "@/features/diary/SiteDiaryPage";
+import { CompanyPage } from "@/features/company/CompanyPage";
 
 export function AppRouter() {
   return (
@@ -48,6 +49,7 @@ export function AppRouter() {
           <Route path="/materials" element={<MaterialsPage />} />
           <Route path="/equipment" element={<EquipmentPage />} />
           <Route path="/site-diary" element={<SiteDiaryPage />} />
+          <Route path="/company" element={<CompanyPage />} />
         </Route>
       </Route>
 

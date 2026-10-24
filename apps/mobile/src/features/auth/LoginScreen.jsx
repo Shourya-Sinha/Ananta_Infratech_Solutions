@@ -23,6 +23,11 @@ export function LoginScreen({ navigation }) {
             </View>
             <Text style={styles.title}>Ananta Infratech</Text>
             <Text style={styles.subtitle}>Workforce & Project Management</Text>
+            <View style={styles.trustRow}>
+              {["Attendance", "Salary", "Sites"].map((x) => (
+                <View key={x} style={styles.trustChip}><Text style={styles.trustText}>{x}</Text></View>
+              ))}
+            </View>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(120).duration(motion.slow).springify().damping(18)} style={styles.form}>
@@ -65,6 +70,7 @@ export function LoginScreen({ navigation }) {
           </Animated.View>
 
           <Animated.View entering={FadeIn.delay(300).duration(motion.slow)}>
+            <Text style={styles.footerNote}>Attendance is marked by your Manager/Admin.{"\n"}Your salary, advances & kharchi update live.</Text>
             <Pressable style={styles.registerRow} onPress={() => navigation.navigate("Register")}>
               <Text style={styles.registerText}>
                 New worker? <Text style={styles.registerLink}>Register</Text>
@@ -109,4 +115,8 @@ const styles = StyleSheet.create({
   registerRow: { marginTop: spacing.xl, alignItems: "center" },
   registerText: { color: colors.graphite300, fontSize: 14 },
   registerLink: { color: colors.white, fontWeight: "700" },
+  trustRow: { flexDirection: "row", gap: 8, marginTop: spacing.md },
+  trustChip: { borderWidth: 1, borderColor: "rgba(255,255,255,0.22)", borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10 },
+  trustText: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: "600" },
+  footerNote: { color: colors.graphite300, fontSize: 11, textAlign: "center", marginTop: spacing.lg, lineHeight: 16 },
 });

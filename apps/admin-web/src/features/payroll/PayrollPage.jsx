@@ -128,6 +128,39 @@ export function PayrollPage() {
     return parts.length > 0 ? parts.join(" · ") : "—";
   };
 
+  const [receiptFor, setReceiptFor] = useState(null); // payroll row being marked paid
+  const [receiptForm, setReceiptForm] = useState({ transactionId: "", ocrText: "", note: "" });
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [ocr, setOcr] = useState(null);
+  const runOcr = useMutation({
+    mutationFn: async (text) => unwrap(api.post("/payroll/receipts/ocr-preview", { text })),
+    onSuccess: (data) => {
+      setOcr(data);
+      if (data?.transactionId) setReceiptForm((f) => ({ ...f, transactionId: data.transactionId }));
+      toast.success(`OCR read: ${data?.amountPaise ? paise(data.amountPaise) : "no amount"}${data?.transactionId ? ` · Txn ${data.transactionId}` : ""}${data?.paidAt ? ` · ${formatDate(data.paidAt)}` : ""}`);
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "OCR failed.")
+  });
+  const markWorkerPaid = useMutation({
+    mutationFn: async () => {
+      const fd = new FormData();
+      if (receiptFile) fd.append("file", receiptFile);
+      fd.append("method", "UPI");
+      if (receiptForm.transactionId) fd.append("transactionId", receiptForm.transactionId);
+      if (receiptForm.ocrText) fd.append("ocrText", receiptForm.ocrText);
+      if (receiptForm.note) fd.append("note", receiptForm.note);
+      const workerId = receiptFor.worker?._id ?? receiptFor.worker;
+      return unwrap(api.post(`/payroll/${month}/workers/${workerId}/mark-paid`, fd));
+    },
+    onSuccess: () => {
+      invalidate();
+      setReceiptFor(null); setReceiptFile(null); setOcr(null);
+      setReceiptForm({ transactionId: "", ocrText: "", note: "" });
+      toast.success("Worker marked paid — receipt saved. The worker can now see it as salary proof.");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not mark paid.")
+  });
+
   const columns = [
     { header: "Employee ID", cell: (r) => r.worker?.employeeId },
     { header: "Worker", cell: (r) => r.worker?.user?.name ?? "—", className: "font-body" },
@@ -147,12 +180,22 @@ export function PayrollPage() {
     {
       header: "",
       cell: (r) => (
-        <button
-          className="text-xs font-medium text-amber-600 hover:underline"
-          onClick={() => setLedgerWorker(r.worker?._id ?? r.worker)}
-        >
-          Ledger
-        </button>
+        <span className="flex gap-3">
+          <button
+            className="text-xs font-medium text-amber-600 hover:underline"
+            onClick={() => setLedgerWorker(r.worker?._id ?? r.worker)}
+          >
+            Ledger
+          </button>
+          {r.status === "FINALIZED" && (
+            <button
+              className="text-xs font-medium text-teal hover:underline"
+              onClick={() => setReceiptFor(r)}
+            >
+              Mark paid + receipt
+            </button>
+          )}
+        </span>
       ),
     },
   ];
@@ -273,6 +316,45 @@ export function PayrollPage() {
             <button type="submit" className="btn-primary" disabled={postAdjustment.isPending}>
               {postAdjustment.isPending ? "Posting…" : "Post adjustment"}
             </button>
+          </div>
+        </form>
+      )}
+
+      {receiptFor && (
+        <form className="card grid gap-3 p-4 md:grid-cols-2" onSubmit={(e) => { e.preventDefault(); markWorkerPaid.mutate(); }}>
+          <p className="font-display text-xs font-semibold uppercase tracking-wide text-graphite-500 md:col-span-2">
+            Mark paid — {receiptFor.worker?.user?.name ?? receiptFor.worker?.employeeId} · net {paise(receiptFor.netSalaryPaise)} · {month}
+          </p>
+          <div>
+            <label className="mb-1 block text-xs text-graphite-500">UPI / bank receipt image (screenshot)</label>
+            <input className="input" type="file" accept="image/*,.pdf" onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-graphite-500">Transaction ID / UTR (from receipt)</label>
+            <input className="input" placeholder="e.g. 412345678901" value={receiptForm.transactionId} onChange={(e) => setReceiptForm({ ...receiptForm, transactionId: e.target.value })} />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs text-graphite-500">
+              OCR — paste the text read from the receipt image (phone OCR / screenshot text). Amount, date, time and transaction ID are extracted automatically.
+            </label>
+            <textarea className="input" rows={3} placeholder="Paste receipt text here, then click Run OCR…" value={receiptForm.ocrText} onChange={(e) => setReceiptForm({ ...receiptForm, ocrText: e.target.value })} />
+            <div className="mt-2 flex items-center gap-3">
+              <button type="button" className="btn-ghost" disabled={!receiptForm.ocrText || runOcr.isPending} onClick={() => runOcr.mutate(receiptForm.ocrText)}>
+                {runOcr.isPending ? "Reading…" : "Run OCR"}
+              </button>
+              {ocr && (
+                <span className="text-xs text-graphite-500">
+                  Detected: {ocr.amountPaise ? paise(ocr.amountPaise) : "—"} · {ocr.transactionId ?? "no txn id"} ·{" "}
+                  {ocr.paidAt ? formatDate(ocr.paidAt) : "no date"} {ocr.time ?? ""} · confidence {Math.round((ocr.confidence ?? 0) * 100)}%
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2 md:col-span-2">
+            <button type="submit" className="btn-accent" disabled={markWorkerPaid.isPending}>
+              {markWorkerPaid.isPending ? "Saving…" : "Confirm paid & save receipt"}
+            </button>
+            <button type="button" className="btn-ghost" onClick={() => setReceiptFor(null)}>Cancel</button>
           </div>
         </form>
       )}

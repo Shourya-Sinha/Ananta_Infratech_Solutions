@@ -170,7 +170,10 @@ function capLines(lines, cap) {
 }
 
 function workerTotal(worker) {
-  return worker.labourPaise + worker.advancePaise + worker.kharchiPaise;
+  // Worker's cost to the company is their GROSS salary. Advances/Kharchi are
+  // paid out of that salary (deducted at payroll), so adding them here
+  // double-counted every worker who had taken an advance.
+  return worker.labourPaise;
 }
 
 function buildFinancialExport(input = {}) {
@@ -347,7 +350,7 @@ function buildFinancialExport(input = {}) {
       advancePaise: bucket.advancePaise,
       kharchiPaise: bucket.kharchiPaise,
       workerPayoutPaise: finance.workerPayoutPaise,
-      workerExpensesPaise: finance.labourPaise + finance.workerPayoutPaise,
+      workerExpensesPaise: finance.labourPaise,
       materialPaise: finance.expensePaise,
       totalExpensesPaise: finance.totalExpensesPaise,
       profitLossPaise: finance.profitLossPaise,
@@ -419,7 +422,7 @@ function buildFinancialExport(input = {}) {
     sites: siteRows,
     unlinked: hasUnlinked ? { ...unlinked, lines: capLines(unlinked.lines, lineCap).lines } : null,
     totals: {
-      workerExpensesPaise: gross.labourPaise + gross.workerPayoutPaise,
+      workerExpensesPaise: gross.labourPaise,
       labourPaise: gross.labourPaise,
       advancePaise: siteRows.reduce((sum, site) => sum + site.advancePaise, 0),
       kharchiPaise: siteRows.reduce((sum, site) => sum + site.kharchiPaise, 0),
@@ -454,7 +457,7 @@ const NOTES = [
   "4. Total income - money the sites earned.",
   "5. Each site - that site's worker expenses, income and investment.",
   "6. Gross - all of the above combined.",
-  "Worker expense = labour earned (wages and overtime) + advances paid + Kharchi paid.",
+  "Worker expense = gross salary earned (wages and overtime). Advances and Kharchi are paid out of that salary and deducted at payroll, so they are listed per worker but never added on top.",
   "Total expenses = total worker expenses + material and other site expenses.",
   "Gross profit / loss = total income - total expenses. This matches the Finance page.",
   "Net position = gross profit / loss - total investment. Investment is not an operating expense.",
@@ -527,7 +530,7 @@ function buildFinanceExportDocument(report) {
       title: "1. Separate worker expenses",
       sheet: "Worker expenses",
       blocks: [
-        { kind: "paragraph", text: "Each worker is listed separately. The total for a worker is labour earned plus advances paid plus Kharchi paid, across every site they worked on." },
+        { kind: "paragraph", text: "Each worker is listed separately. The total for a worker is their gross salary earned; advances paid plus Kharchi paid, across every site they worked on." },
         { kind: "table", sheet: "Worker expenses", columns: WORKER_COLUMNS, rows: report.workers },
         { kind: "heading", text: "Each worker expense line", sheet: "Worker lines" },
         { kind: "paragraph", sheet: "Worker lines", text: "Every counted wage, advance and Kharchi line. Labour is the wage earned. Advances and Kharchi are cash paid to the worker." },

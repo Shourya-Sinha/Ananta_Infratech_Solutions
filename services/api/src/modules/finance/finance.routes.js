@@ -160,6 +160,45 @@ financeRouter.post("/transactions/:id/reverse", (0, _rbac.requirePermission)("si
   res.status(201).json(body);
 }));
 
+// --- Site monthly billing + profit/loss dashboard -------------------------
+const monthSchema = _zod.z.string().regex(/^\d{4}-\d{2}$/, "month must be YYYY-MM");
+const setBillingSchema = _zod.z.object({
+  siteId: _zod.z.string().min(1),
+  month: monthSchema,
+  billedAmountRupees: _zod.z.number().min(0),
+  receivedAmountRupees: _zod.z.number().min(0).optional(),
+  note: _zod.z.string().trim().max(500).optional()
+});
+financeRouter.put("/site-billing", (0, _rbac.requirePermission)("site.billing.manage"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const input = setBillingSchema.parse(req.body);
+  const billing = await _finance.FinanceService.setSiteBilling(input, req.auth.userId);
+  res.json({ success: true, data: billing });
+}));
+financeRouter.get("/site-billing", (0, _rbac.requirePermission)("financialReports.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const query = _zod.z.object({ site: _zod.z.string().min(1), month: monthSchema }).parse(req.query);
+  const billing = await _finance.FinanceService.getSiteBilling(query.site, query.month);
+  res.json({ success: true, data: billing });
+}));
+// Per-site: billing vs salary/advance/Kharchi/other expenses/investment,
+// profit or loss, plus the daily approximate projection.
+financeRouter.get("/site/:id/dashboard", (0, _rbac.requirePermission)("financialReports.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const query = _zod.z.object({ month: monthSchema }).parse(req.query);
+  if (req.auth.role === "MANAGER") {
+    const { Site } = require("../../db/models/Site");
+    const site = await Site.findById(req.params.id);
+    if (!site || site.manager?.toString() !== req.auth.userId) throw _AppError.AppError.forbidden("You don't manage this site.");
+  }
+  const result = await _finance.FinanceService.getSiteDashboard(req.params.id, query.month);
+  res.json({ success: true, data: result });
+}));
+// All sites + gross totals for the month.
+financeRouter.get("/overview", (0, _rbac.requirePermission)("financialReports.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  if (req.auth.role === "MANAGER") throw _AppError.AppError.forbidden("Company-wide finance is for Admin only.");
+  const query = _zod.z.object({ month: monthSchema }).parse(req.query);
+  const result = await _finance.FinanceService.getCompanyDashboard(query.month);
+  res.json({ success: true, data: result });
+}));
+
 // --- Profit / Loss -------------------------------------------------------
 
 financeRouter.get("/site/:id/profit-loss", (0, _rbac.requirePermission)("financialReports.read"), (0, _errorHandler.asyncHandler)(async (req, res) => {

@@ -32,6 +32,7 @@ var _material = require("./modules/materials/material.routes");
 var _equipment = require("./modules/equipment/equipment.routes");
 var _diary = require("./modules/diary/diary.routes");
 var _media = require("./modules/media/media.routes");
+var _company = require("./modules/company/company.routes");
 var _openapi = require("./config/openapi");
 var _corsConfig = require("./config/cors");
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
@@ -117,6 +118,7 @@ function createApp() {
   app.use("/api/v1/equipment", _equipment.equipmentRouter);
   app.use("/api/v1/site-diary", _diary.diaryRouter);
   app.use("/api/v1/media", _media.mediaRouter);
+  app.use("/api/v1/company", _company.companyRouter);
   // Every module from the architecture doc (§33 API design) is now mounted.
 
   app.use(_errorHandler.notFoundHandler);

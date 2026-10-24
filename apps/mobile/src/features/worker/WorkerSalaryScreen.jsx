@@ -1,12 +1,13 @@
 import { useState, useCallback } from "react";
-import { View, Text, ScrollView, StyleSheet, RefreshControl } from "react-native";
+import { View, Text, ScrollView, StyleSheet, RefreshControl, Share } from "react-native";
 import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, EmptyState } from "@/components/ui";
+import { Card, EmptyState, Button } from "@/components/ui";
+import { EarningsBars, SectionTitle } from "@/components/design";
 import { CountUp, PressScale, ProgressBar, formatINR } from "@/components/interactive";
-import { useMyStatement } from "./api";
+import { useMyStatement, useMyReceipts } from "./api";
 import { currentMonthKey, monthLabel, toRupeeView } from "@/lib/salaryDisplay";
 import { colors, spacing, radius, shadow } from "@/theme";
 
@@ -23,6 +24,7 @@ export function WorkerSalaryScreen() {
   const qc = useQueryClient();
   const month = currentMonthKey();
   const { data: statement, isLoading, refetch } = useMyStatement(month);
+  const { data: receipts } = useMyReceipts();
   const pay = toRupeeView(statement);
   const [openDay, setOpenDay] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,6 +60,30 @@ export function WorkerSalaryScreen() {
         </LinearGradient>
       </Animated.View>
 
+      {pay && (
+        <View style={{ marginTop: spacing.md }}>
+          <Button
+            title="Share salary summary"
+            variant="ghost"
+            onPress={() =>
+              Share.share({
+                message: `Ananta Infratech — Salary summary (${monthLabel(month)})\nEarnings: ${formatINR(pay.earnings)} (incl. overtime ${formatINR(pay.overtime)})\nAdvances deducted: ${formatINR(pay.advances)}\nKharchi deducted: ${formatINR(pay.kharchi)}\nNET SALARY: ${formatINR(pay.net)}`
+              }).catch(() => {})
+            }
+          />
+        </View>
+      )}
+
+      <SectionTitle>Daily net</SectionTitle>
+      <Card>
+        <EarningsBars
+          data={(pay?.daily ?? []).slice(0, 14).reverse().map((d) => ({
+            label: new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", timeZone: "UTC" }),
+            value: d.netPaise / 100
+          }))}
+        />
+      </Card>
+
       {pay && (pay.pendingAdvance > 0 || pay.pendingKharchi > 0) && (
         <Animated.View entering={FadeInDown.delay(80).duration(300)} style={styles.pending}>
           <Ionicons name="time-outline" size={16} color={colors.amber600} />
@@ -79,6 +105,24 @@ export function WorkerSalaryScreen() {
         <View style={styles.divider} />
         <BreakdownRow icon="wallet-outline" color={colors.graphite900} label="Net salary" value={pay?.net ?? 0} bold />
       </Card>
+
+      {receipts && receipts.length > 0 && (
+        <>
+          <Text style={styles.sectionLabel}>Salary payment receipts</Text>
+          {receipts.map((r) => (
+            <Card key={r._id} style={{ marginBottom: spacing.sm }}>
+              <Text style={styles.dayDate}>
+                {r.month} · {formatINR(r.amountPaise / 100)} · {r.method}
+              </Text>
+              <Text style={styles.dayMeta}>
+                {r.transactionId ? `Txn/UTR: ${r.transactionId} · ` : ""}
+                {r.paidAt ? new Date(r.paidAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : ""}
+                {r.receiptUrl ? " · Receipt image attached (ask Admin to view)" : ""}
+              </Text>
+            </Card>
+          ))}
+        </>
+      )}
 
       <Text style={styles.sectionLabel}>Day by day</Text>
       {!isLoading && (!pay || pay.daily.length === 0) ? (

@@ -169,6 +169,62 @@ exports.PayrollService = {
     };
   },
   /**
+   * Marks ONE worker's month paid and (optionally) stores the payment
+   * receipt with its OCR extraction. Used when salary is sent worker-by-
+   * worker via UPI/bank instead of the whole-month bulk mark-paid.
+   */
+  async markWorkerPaid({ workerId, month, receipt }, actorId) {
+    const { SalaryPaymentReceipt } = require("../../db/models/SalaryPaymentReceipt");
+    const payroll = await _MonthlyPayroll.MonthlyPayroll.findOne({ worker: workerId, month });
+    if (!payroll) throw _AppError.AppError.notFound(`No payroll record for ${month}. Calculate the month first.`);
+    if (payroll.status !== "FINALIZED" && payroll.status !== "PAID") {
+      throw _AppError.AppError.conflict(`Payroll for ${month} must be FINALIZED before it can be marked paid (current: ${payroll.status}).`);
+    }
+    let savedReceipt = null;
+    if (receipt) {
+      savedReceipt = await SalaryPaymentReceipt.create({
+        worker: workerId,
+        payroll: payroll._id,
+        month,
+        amountPaise: receipt.amountPaise ?? payroll.netSalaryPaise,
+        method: receipt.method ?? "UPI",
+        transactionId: receipt.transactionId,
+        paidAt: receipt.paidAt ?? new Date(),
+        document: receipt.documentId,
+        receiptUrl: receipt.receiptUrl,
+        ocr: receipt.ocr,
+        note: receipt.note,
+        uploadedBy: actorId
+      });
+    }
+    if (payroll.status !== "PAID") {
+      payroll.status = "PAID";
+      payroll.paidAt = receipt?.paidAt ?? new Date();
+      await payroll.save();
+      const profile = await _WorkerProfile.WorkerProfile.findById(workerId);
+      if (profile) {
+        await _notification.NotificationService.send({
+          recipient: profile.user.toString(),
+          type: "SALARY_PAID",
+          title: "Your salary has been paid",
+          body: `Your salary for ${month} has been sent.${savedReceipt ? " Tap Salary to view the payment receipt." : ""}`
+        });
+      }
+    }
+    await _audit.AuditService.log({
+      actor: actorId,
+      action: "PAYROLL_WORKER_PAID",
+      targetType: "MonthlyPayroll",
+      targetId: payroll._id.toString(),
+      after: { month, receiptId: savedReceipt?._id?.toString(), transactionId: savedReceipt?.transactionId }
+    });
+    return { payroll, receipt: savedReceipt };
+  },
+  async listWorkerReceipts(workerId) {
+    const { SalaryPaymentReceipt } = require("../../db/models/SalaryPaymentReceipt");
+    return SalaryPaymentReceipt.find({ worker: workerId }).sort({ createdAt: -1 });
+  },
+  /**
    * Posts an ADJUSTMENT ledger entry against a FINALIZED/PAID month instead
    * of mutating history (§43 of spec: "Do not silently change finalized payroll").
    * Does NOT reopen the payroll status — a fresh calculateMonth pass for a

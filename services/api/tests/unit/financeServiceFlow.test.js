@@ -89,7 +89,7 @@ describe("FinanceService.getSiteProfitLoss (with investments)", () => {
     expect(result.netPosition).toBe(-6500); // 3500 − 10000
   });
 
-  test("site expenses include paid worker payouts from the salary ledger", async () => {
+  test("paid worker payouts are reported separately, not added on top of salary", async () => {
     Finance.FinancialTransaction.aggregate.mockResolvedValue([]);
     SalaryLedger.aggregate
       .mockResolvedValueOnce([]) // accrued labour
@@ -101,7 +101,9 @@ describe("FinanceService.getSiteProfitLoss (with investments)", () => {
     const result = await FinanceService.getSiteProfitLoss(siteId);
 
     expect(result.workerPayouts).toBe(1250);
-    expect(result.totalExpenses).toBe(1250);
+    // Payout is part of the worker's salary, not an extra expense: with no
+    // gross salary in this mock period, total expenses stay 0.
+    expect(result.totalExpenses).toBe(0);
   });
 
   test("reversed investments are subtracted from the total", async () => {
@@ -192,13 +194,13 @@ describe("FinanceService.getGrossSummary (per-site rows + company gross totals)"
 
     expect(summary.sites[0]).toMatchObject({
       workerPayouts: 3000,
-      totalExpenses: 6000,
-      profitLoss: 4000
+      totalExpenses: 3000, // 2,000 other + 1,000 labour; the 3,000 payout is inside the salary, not on top
+      profitLoss: 7000
     });
     expect(summary.totals).toMatchObject({
       totalWorkerPayouts: 3000,
-      totalExpenses: 6000,
-      grossProfitLoss: 4000
+      totalExpenses: 3000,
+      grossProfitLoss: 7000
     });
   });
 });
