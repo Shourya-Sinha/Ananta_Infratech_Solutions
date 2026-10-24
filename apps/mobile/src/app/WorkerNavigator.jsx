@@ -1,36 +1,54 @@
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { Tab, makeStack, AppTabBar, tabScreenOptions } from "./tabNavigator";
 import { WorkerHomeScreen } from "@/features/worker/WorkerHomeScreen";
 import { WorkerAttendanceScreen } from "@/features/worker/WorkerAttendanceScreen";
 import { WorkerSalaryScreen } from "@/features/worker/WorkerSalaryScreen";
 import { WorkerDocumentsScreen } from "@/features/worker/WorkerDocumentsScreen";
 import { RequestAdvanceScreen } from "@/features/worker/RequestAdvanceScreen";
 import { RequestKharchiScreen } from "@/features/worker/RequestKharchiScreen";
+import { AnnouncementsScreen } from "@/features/company/AnnouncementsScreen";
+import { LeaveScreen } from "@/features/company/LeaveScreen";
+import { IdCardScreen } from "@/features/company/IdCardScreen";
 import { NotificationsScreen } from "@/features/shared/NotificationsScreen";
 import { SupportScreen } from "@/features/shared/SupportScreen";
 import { ProfileScreen } from "@/features/shared/ProfileScreen";
-import { colors } from "@/theme";
 
-const Stack = createNativeStackNavigator();
+const HomeStack = makeStack([
+  ["WorkerHome", WorkerHomeScreen, "Home"],
+  ["IdCard", IdCardScreen, "My ID Card"]
+], "WorkerHome");
 
-const screenOptions = {
-  headerStyle: { backgroundColor: colors.surface },
-  headerTitleStyle: { color: colors.graphite900, fontSize: 16, fontWeight: "700" },
-  headerTintColor: colors.graphite900,
-  contentStyle: { backgroundColor: colors.paper }
-};
+const SalaryStack = makeStack([
+  ["WorkerSalary", WorkerSalaryScreen, "Salary"]
+], "WorkerSalary");
 
+const AttendanceStack = makeStack([
+  ["WorkerAttendance", WorkerAttendanceScreen, "Attendance"]
+], "WorkerAttendance");
+
+const ServicesStack = makeStack([
+  ["ServicesHome", ProfileScreen, "Services"],
+  ["WorkerDocuments", WorkerDocumentsScreen, "Documents"],
+  ["RequestAdvance", RequestAdvanceScreen, "Advance"],
+  ["RequestKharchi", RequestKharchiScreen, "Kharchi"],
+  ["Announcements", AnnouncementsScreen, "Announcements"],
+  ["Leave", LeaveScreen, "Leave"],
+  ["Notifications", NotificationsScreen, "Notifications"],
+  ["Support", SupportScreen, "Support"],
+  ["IdCard", IdCardScreen, "My ID Card"]
+], "ServicesHome");
+
+/**
+ * Worker app: Home · Attendance · Salary · Services.
+ * Workers only VIEW attendance/salary — marking is Manager/Admin work,
+ * enforced again on the API. Everything else lives under Services.
+ */
 export function WorkerNavigator() {
   return (
-    <Stack.Navigator screenOptions={screenOptions}>
-      <Stack.Screen name="WorkerHome" component={WorkerHomeScreen} options={{ title: "Home" }} />
-      <Stack.Screen name="WorkerAttendance" component={WorkerAttendanceScreen} options={{ title: "Attendance" }} />
-      <Stack.Screen name="WorkerSalary" component={WorkerSalaryScreen} options={{ title: "Salary" }} />
-      <Stack.Screen name="WorkerDocuments" component={WorkerDocumentsScreen} options={{ title: "Documents" }} />
-      <Stack.Screen name="RequestAdvance" component={RequestAdvanceScreen} options={{ title: "Advance" }} />
-      <Stack.Screen name="RequestKharchi" component={RequestKharchiScreen} options={{ title: "Kharchi" }} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Notifications" }} />
-      <Stack.Screen name="Support" component={SupportScreen} options={{ title: "Support" }} />
-      <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
-    </Stack.Navigator>);
-
+    <Tab.Navigator screenOptions={tabScreenOptions} tabBar={(props) => <AppTabBar {...props} />}>
+      <Tab.Screen name="Home" component={HomeStack} options={{ tabBarLabel: "Home" }} />
+      <Tab.Screen name="Attendance" component={AttendanceStack} options={{ tabBarLabel: "Attendance" }} />
+      <Tab.Screen name="Salary" component={SalaryStack} options={{ tabBarLabel: "Salary" }} />
+      <Tab.Screen name="Services" component={ServicesStack} options={{ tabBarLabel: "Services" }} />
+    </Tab.Navigator>
+  );
 }

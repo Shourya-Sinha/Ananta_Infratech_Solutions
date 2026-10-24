@@ -1,48 +1,32 @@
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ManagerHomeScreen } from "@/features/manager/ManagerHomeScreen";
-import { ManagerWorkersScreen } from "@/features/manager/ManagerWorkersScreen";
-import { MarkAttendanceScreen } from "@/features/manager/MarkAttendanceScreen";
-import { AddWorkerScreen } from "@/features/manager/AddWorkerScreen";
-import { SubmitAdvanceScreen } from "@/features/manager/SubmitAdvanceScreen";
-import { SubmitKharchiScreen } from "@/features/manager/SubmitKharchiScreen";
-import { SetSalaryRateScreen } from "@/features/manager/SetSalaryRateScreen";
-import { SiteFinanceScreen } from "@/features/manager/SiteFinanceScreen";
-import { NotificationsScreen } from "@/features/shared/NotificationsScreen";
-import { SupportScreen } from "@/features/shared/SupportScreen";
-import { ProfileScreen } from "@/features/shared/ProfileScreen";
-import { colors } from "@/theme";
+import { Tab, makeStack, AppTabBar, tabScreenOptions } from "./tabNavigator";
+import {
+  managerHomeStackScreens,
+  managerWorkersStackScreens,
+  managerMarkStackScreens,
+  managerFinanceStackScreens,
+  managerMoreStackScreens
+} from "./ManagerNavigator";
 
-const Stack = createNativeStackNavigator();
-
-const screenOptions = {
-  headerStyle: { backgroundColor: colors.surface },
-  headerTitleStyle: { color: colors.graphite900, fontSize: 16, fontWeight: "700" },
-  headerTintColor: colors.graphite900,
-  contentStyle: { backgroundColor: colors.paper }
-};
+const HomeStack = makeStack(managerHomeStackScreens, "ManagerHome");
+const WorkersStack = makeStack(managerWorkersStackScreens, "Workers");
+const MarkStack = makeStack(managerMarkStackScreens, "MarkAttendance");
+const FinanceStack = makeStack(managerFinanceStackScreens, "SiteFinance");
+const MoreStack = makeStack(managerMoreStackScreens, "MoreHome");
 
 /**
- * SUPER_ADMIN on mobile. Admins get everything a Manager gets (any site,
- * not just managed ones — enforced server-side) plus salary-rate setting
- * and site billing/finance. The full Admin Panel (payroll finalization,
- * permission matrix, reports) stays in the Admin Web app, which is
- * Admin-only: the API rejects non-SUPER_ADMIN roles there by permission,
- * and workers/managers never receive those permissions by default.
+ * SUPER_ADMIN on mobile: same modern tab shell as Manager, but the API lets
+ * Admin work on ANY site, set salary rates and site billing, publish
+ * announcements and decide every leave request. The full Admin Panel stays
+ * in the Admin Web app (Super-Admin only).
  */
 export function AdminNavigator() {
   return (
-    <Stack.Navigator screenOptions={screenOptions}>
-      <Stack.Screen name="ManagerHome" component={ManagerHomeScreen} options={{ title: "Admin Home" }} />
-      <Stack.Screen name="Workers" component={ManagerWorkersScreen} options={{ title: "Workers" }} />
-      <Stack.Screen name="MarkAttendance" component={MarkAttendanceScreen} options={{ title: "Mark Attendance" }} />
-      <Stack.Screen name="AddWorker" component={AddWorkerScreen} options={{ title: "Add Worker" }} />
-      <Stack.Screen name="SubmitAdvance" component={SubmitAdvanceScreen} options={{ title: "Request Advance" }} />
-      <Stack.Screen name="SubmitKharchi" component={SubmitKharchiScreen} options={{ title: "Request Kharchi" }} />
-      <Stack.Screen name="SetSalaryRate" component={SetSalaryRateScreen} options={{ title: "Set Salary Rate" }} />
-      <Stack.Screen name="SiteFinance" component={SiteFinanceScreen} options={{ title: "Site Finance" }} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Notifications" }} />
-      <Stack.Screen name="Support" component={SupportScreen} options={{ title: "Support" }} />
-      <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
-    </Stack.Navigator>
+    <Tab.Navigator screenOptions={tabScreenOptions} tabBar={(props) => <AppTabBar {...props} />}>
+      <Tab.Screen name="Home" component={HomeStack} options={{ tabBarLabel: "Home" }} />
+      <Tab.Screen name="Workers" component={WorkersStack} options={{ tabBarLabel: "Workers" }} />
+      <Tab.Screen name="Mark" component={MarkStack} options={{ tabBarLabel: "Mark" }} />
+      <Tab.Screen name="Finance" component={FinanceStack} options={{ tabBarLabel: "Finance" }} />
+      <Tab.Screen name="More" component={MoreStack} options={{ tabBarLabel: "More" }} />
+    </Tab.Navigator>
   );
 }

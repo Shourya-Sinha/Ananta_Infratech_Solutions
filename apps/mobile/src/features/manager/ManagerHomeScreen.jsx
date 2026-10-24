@@ -2,6 +2,7 @@ import { View, Text, ScrollView, StyleSheet, Pressable } from "react-native";
 import { useState, useMemo } from "react";
 import { useNavigation } from "@react-navigation/native";
 import { ScreenHeader, Card } from "@/components/ui";
+import { GradientHero } from "@/components/design";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { useManagedSites, useManagedWorkers, useTodayAttendance } from "./api";
 import { useAuthStore } from "@/stores/authStore";
@@ -32,6 +33,18 @@ export function ManagerHomeScreen() {
       <OfflineBanner />
       <ScreenHeader title={`Good day, ${user?.name?.split(" ")[0] ?? ""}`} subtitle="Today's workforce" />
 
+      <GradientHero style={{ marginBottom: spacing.md }}>
+        <Text style={{ color: "rgba(255,255,255,0.65)", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6 }}>
+          {(user?.baseRole ?? user?.role) === "SUPER_ADMIN" ? "Admin · all sites" : "Manager · your sites"}
+        </Text>
+        <Text style={{ color: "#fff", fontSize: 20, fontWeight: "800", marginTop: 4 }}>
+          {stats.present} present · {stats.notMarked} not marked
+        </Text>
+        <Text style={{ color: "rgba(255,255,255,0.65)", fontSize: 12, marginTop: 3 }}>
+          {sites?.length ?? 0} site(s) · {workers?.length ?? 0} worker(s) · today {today}
+        </Text>
+      </GradientHero>
+
       {sites && sites.length > 1 &&
       <View style={styles.siteRow}>
           {sites.map((s) =>
@@ -56,11 +69,13 @@ export function ManagerHomeScreen() {
       <Text style={styles.sectionLabel}>Quick actions</Text>
       <View style={styles.actionsGrid}>
         <ActionButton label="Mark attendance" onPress={() => navigation.navigate("MarkAttendance")} />
-        <ActionButton label="Add worker" onPress={() => navigation.navigate("AddWorker")} />
-        <ActionButton label="Request advance" onPress={() => navigation.navigate("SubmitAdvance")} />
-        <ActionButton label="Request Kharchi" onPress={() => navigation.navigate("SubmitKharchi")} />
-        <ActionButton label="Set salary rate" onPress={() => navigation.navigate("SetSalaryRate")} />
-        <ActionButton label="Site finance" onPress={() => navigation.navigate("SiteFinance")} />
+        <ActionButton label="Add worker" onPress={() => navigation.navigate("Workers", { screen: "AddWorker" })} />
+        <ActionButton label="Request advance" onPress={() => navigation.navigate("More", { screen: "SubmitAdvance" })} />
+        <ActionButton label="Request Kharchi" onPress={() => navigation.navigate("More", { screen: "SubmitKharchi" })} />
+        <ActionButton label="Set salary rate" onPress={() => navigation.navigate("Workers", { screen: "SetSalaryRate" })} />
+        <ActionButton label="Site finance" onPress={() => navigation.navigate("Finance")} />
+        <ActionButton label="Leave approvals" onPress={() => navigation.navigate("More", { screen: "Leave" })} />
+        <ActionButton label="Announcements" onPress={() => navigation.navigate("More", { screen: "Announcements" })} />
       </View>
     </ScrollView>);
 

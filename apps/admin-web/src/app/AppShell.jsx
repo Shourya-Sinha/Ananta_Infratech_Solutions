@@ -23,7 +23,8 @@ import {
   Users,
   Wallet,
   Wrench,
-  X
+  X,
+  Megaphone
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useLogout } from "@/features/auth/api";
@@ -74,7 +75,7 @@ const NAV_GROUPS = [
   },
   {
     label: "Communication",
-    items: [{ to: "/support", label: "Support Chat", icon: MessagesSquare }]
+    items: [{ to: "/support", label: "Support Chat", icon: MessagesSquare }, { to: "/company", label: "Announcements, Holidays & Leave", icon: Megaphone }]
   },
   {
     label: "Governance",

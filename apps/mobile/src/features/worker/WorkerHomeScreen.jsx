@@ -1,23 +1,19 @@
 import { useState, useCallback } from "react";
 import { View, Text, ScrollView, StyleSheet, RefreshControl } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, Badge } from "@/components/ui";
+import { Card } from "@/components/ui";
 import { CountUp, PressScale, ProgressBar, formatINR } from "@/components/interactive";
+import { GradientHero, Avatar, StatTile, ActionTile, SectionTitle, EarningsBars } from "@/components/design";
 import { useAuthStore } from "@/stores/authStore";
 import { useMyProfile, useMyAttendance, useMyStatement, useMySalaryPreview } from "./api";
+import { useAnnouncements } from "@/features/company/api";
 import { currentMonthKey, monthLabel, greeting, todayKeyIST, toRupeeView } from "@/lib/salaryDisplay";
-import { colors, spacing, radius, shadow } from "@/theme";
+import { colors, spacing, shadow } from "@/theme";
 
-const QUICK_ACTIONS = [
-  { label: "Attendance", icon: "calendar-outline", route: "WorkerAttendance", tint: colors.teal },
-  { label: "Advance", icon: "cash-outline", route: "RequestAdvance", tint: colors.amber },
-  { label: "Kharchi", icon: "receipt-outline", route: "RequestKharchi", tint: colors.rust },
-  { label: "Documents", icon: "document-text-outline", route: "WorkerDocuments", tint: colors.graphite500 }
-];
+const go = (navigation, tab, screen) => navigation.navigate(tab, { screen });
 
 export function WorkerHomeScreen() {
   const navigation = useNavigation();
@@ -31,17 +27,20 @@ export function WorkerHomeScreen() {
   const { data: attendance, refetch: refetchAttendance } = useMyAttendance(today, today);
   const { data: statement, refetch: refetchStatement } = useMyStatement(month);
   const { data: preview } = useMySalaryPreview(month);
+  const { data: announcements } = useAnnouncements();
   const pay = toRupeeView(statement);
   const todayRecord = attendance?.[0];
-  const recent = (pay?.daily ?? []).flatMap((d) => d.entries.map((e) => ({ ...e, date: d.date }))).slice(0, 4);
+  const topNotice = announcements?.[0];
+
+  const last7 = (pay?.daily ?? []).slice(0, 7).reverse().map((d) => ({
+    label: new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "narrow", timeZone: "UTC" }),
+    value: d.netPaise / 100
+  }));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    try {
-      await Promise.all([qc.invalidateQueries({ queryKey: ["worker"] }), refetchAttendance(), refetchStatement()]);
-    } finally {
-      setRefreshing(false);
-    }
+    try { await Promise.all([qc.invalidateQueries({ queryKey: ["worker"] }), qc.invalidateQueries({ queryKey: ["company"] }), refetchAttendance(), refetchStatement()]); }
+    finally { setRefreshing(false); }
   }, [qc, refetchAttendance, refetchStatement]);
 
   const firstName = user?.name?.split(" ")[0] ?? "";
@@ -49,25 +48,27 @@ export function WorkerHomeScreen() {
   const rejected = profile?.verificationStatus === "REJECTED";
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.amber} />}
-    >
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.amber} />}>
+      {/* Header */}
       <Animated.View entering={FadeInDown.duration(300)} style={styles.header}>
+        <Avatar name={user?.name ?? "?"} size={46} />
         <View style={{ flex: 1 }}>
           <Text style={styles.greet}>{greeting()}, {firstName}</Text>
           <Text style={styles.date}>
             {new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "short", timeZone: "Asia/Kolkata" }).format(new Date())}
+            {profile?.currentSite?.name ? ` · ${profile.currentSite.name}` : ""}
           </Text>
         </View>
-        <PressScale onPress={() => navigation.navigate("Notifications")} style={styles.bell} accessibilityLabel="Notifications">
+        <PressScale onPress={() => go(navigation, "Services", "Notifications")} style={styles.bell} accessibilityLabel="Notifications">
           <Ionicons name="notifications-outline" size={20} color={colors.graphite900} />
+        </PressScale>
+        <PressScale onPress={() => go(navigation, "Home", "IdCard")} style={styles.bell} accessibilityLabel="My ID card">
+          <Ionicons name="id-card-outline" size={20} color={colors.graphite900} />
         </PressScale>
       </Animated.View>
 
       {needsDocs && (
-        <PressScale onPress={() => navigation.navigate("WorkerDocuments")}>
+        <PressScale onPress={() => go(navigation, "Services", "WorkerDocuments")}>
           <Card style={styles.banner}>
             <Ionicons name="alert-circle" size={20} color={colors.amber600} />
             <View style={{ flex: 1 }}>
@@ -79,160 +80,124 @@ export function WorkerHomeScreen() {
         </PressScale>
       )}
       {rejected && (
-        <PressScale onPress={() => navigation.navigate("WorkerDocuments")}>
+        <PressScale onPress={() => go(navigation, "Services", "WorkerDocuments")}>
           <Card style={[styles.banner, styles.bannerRust]}>
             <Ionicons name="close-circle" size={20} color={colors.rust} />
             <View style={{ flex: 1 }}>
               <Text style={styles.bannerTitle}>Documents need correction</Text>
               <Text style={styles.bannerBody}>Tap to see what needs fixing and re-upload.</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.rust} />
           </Card>
         </PressScale>
       )}
 
-      {/* Hero: live net pay for the current calendar month */}
+      {/* Salary hero */}
       <Animated.View entering={FadeInDown.delay(60).duration(350)}>
-        <PressScale onPress={() => navigation.navigate("WorkerSalary")} accessibilityLabel="Open salary statement">
-          <LinearGradient colors={["#1B2027", colors.graphite900]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <PressScale onPress={() => navigation.navigate("Salary")} accessibilityLabel="Open salary statement">
+          <GradientHero>
             <View style={styles.heroTop}>
               <Text style={styles.heroKicker}>Net pay · {monthLabel(month)}</Text>
-              <View style={styles.liveDot}>
-                <View style={styles.liveDotInner} />
-                <Text style={styles.liveText}>LIVE</Text>
-              </View>
+              <View style={styles.liveDot}><View style={styles.liveDotInner} /><Text style={styles.liveText}>LIVE</Text></View>
             </View>
             <CountUp value={pay?.net ?? 0} style={styles.heroAmount} />
-            <Text style={styles.heroFormula}>
-              Earned {formatINR(pay?.earnings ?? 0)} − advances {formatINR(pay?.advances ?? 0)} − kharchi {formatINR(pay?.kharchi ?? 0)}
-            </Text>
-            <View style={{ marginTop: spacing.md }}>
-              <ProgressBar percent={pay?.netPercent ?? 0} color={colors.amberBright} />
-              <Text style={styles.heroHint}>{pay?.netPercent ?? 0}% of earnings kept · tap for statement</Text>
+            <Text style={styles.heroFormula}>Earned {formatINR(pay?.earnings ?? 0)} − advances {formatINR(pay?.advances ?? 0)} − kharchi {formatINR(pay?.kharchi ?? 0)}</Text>
+            <ProgressBar percent={pay?.netPercent ?? 0} color={colors.gold} />
+            <Text style={styles.heroHint}>{pay?.netPercent ?? 0}% of earnings kept · tap for full statement</Text>
+            <View style={styles.heroStats}>
+              <HeroStat label="Today" value={formatINR((preview?.today.netPaise ?? 0) / 100)} />
+              <HeroStat label="Approx month" value={formatINR((preview?.approximateMonthlyNetPaise ?? 0) / 100)} />
+              <HeroStat label="Per day" value={formatINR((preview?.rates.dailyRatePaise ?? 0) / 100)} />
             </View>
-          </LinearGradient>
+          </GradientHero>
         </PressScale>
       </Animated.View>
 
-      {pay && (pay.pendingAdvance > 0 || pay.pendingKharchi > 0) && (
-        <View style={styles.pendingRow}>
-          <Ionicons name="hourglass-outline" size={14} color={colors.amber600} />
-          <Text style={styles.pendingText}>
-            {pay.pendingAdvance > 0 && `Advance ${formatINR(pay.pendingAdvance)} awaiting approval`}
-            {pay.pendingAdvance > 0 && pay.pendingKharchi > 0 && " · "}
-            {pay.pendingKharchi > 0 && `Kharchi ${formatINR(pay.pendingKharchi)} awaiting approval`}
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.row}>
-        <Card style={styles.halfCard} delay={120}>
-          <Text style={styles.label}>Today</Text>
-          {todayRecord ? (
-            <Badge label={todayRecord.status} tone={todayRecord.status === "PRESENT" ? "positive" : "negative"} />
-          ) : (
-            <Text style={styles.value}>Not marked</Text>
-          )}
-          <Text style={styles.sub}>{todayRecord?.hoursWorked ?? 0}h worked</Text>
-          <Text style={styles.sub}>
-            Today salary: {formatINR((preview?.today.netPaise ?? 0) / 100)}
-            {todayRecord ? "" : " · marked by your manager"}
-          </Text>
-        </Card>
-        <Card style={styles.halfCard} delay={160}>
-          <Text style={styles.label}>Assigned site</Text>
-          <Text style={styles.value} numberOfLines={2}>{profile?.currentSite?.name ?? "Not assigned yet"}</Text>
-        </Card>
+      {/* Today + site */}
+      <View style={styles.tileRow}>
+        <StatTile delay={100} icon={todayRecord ? "checkmark-circle" : "time"} tint={todayRecord?.status === "ABSENT" ? colors.rust : colors.teal}
+          label="Today's attendance" value={todayRecord ? todayRecord.status.replace("_", " ") : "Not marked"}
+          sub={todayRecord ? `${todayRecord.hoursWorked ?? 0}h worked · by manager` : "Your manager marks it"} />
+        <StatTile delay={140} icon="location" tint={colors.sky} label="Assigned site" value={profile?.currentSite?.name ?? "Not assigned"} sub={profile?.workType?.name ?? ""} />
       </View>
 
-      {preview && (
-        <Card delay={200} style={{ marginTop: spacing.md }}>
-          <Text style={styles.label}>Your salary rate</Text>
-          <Text style={styles.value}>
-            {formatINR(preview.rates.hourlyRatePaise / 100)}/hr · {formatINR(preview.rates.dailyRatePaise / 100)}/day ·{" "}
-            {formatINR(preview.rates.monthlySalaryPaise / 100)}/month
-          </Text>
-          <Text style={styles.sub}>
-            Approx monthly salary: {formatINR(preview.approximateMonthlyNetPaise / 100)} net (after advance/Kharchi deducted so
-            far) · Attendance is marked by your manager/admin — you cannot mark it yourself.
-          </Text>
-        </Card>
-      )}
+      {/* Last 7 days earnings */}
+      <SectionTitle actionLabel="Statement →" onAction={() => navigation.navigate("Salary")}>Last days · earnings</SectionTitle>
+      <Card delay={160}>
+        <EarningsBars data={last7} />
+        <Text style={styles.chartHint}>Net per day after that day's deductions · salary rate {formatINR((preview?.rates.hourlyRatePaise ?? 0) / 100)}/hr · {formatINR((preview?.rates.monthlySalaryPaise ?? 0) / 100)}/month approx</Text>
+      </Card>
 
-      <Text style={styles.sectionLabel}>Quick actions</Text>
-      <View style={styles.actions}>
-        {QUICK_ACTIONS.map((a, i) => (
-          <Animated.View key={a.route} entering={FadeInDown.delay(180 + i * 40).duration(300)} style={styles.actionWrap}>
-            <PressScale onPress={() => navigation.navigate(a.route)} style={[styles.action, shadow.soft]} accessibilityLabel={a.label}>
-              <View style={[styles.actionIcon, { backgroundColor: `${a.tint}1A` }]}>
-                <Ionicons name={a.icon} size={20} color={a.tint} />
-              </View>
-              <Text style={styles.actionLabel}>{a.label}</Text>
-            </PressScale>
-          </Animated.View>
-        ))}
-      </View>
-
-      {recent.length > 0 && (
+      {/* Announcement */}
+      {topNotice && (
         <>
-          <Text style={styles.sectionLabel}>Latest activity</Text>
-          <Card style={{ padding: 0 }}>
-            {recent.map((e, i) => (
-              <View key={`${e.id ?? i}`} style={[styles.activityRow, i > 0 && styles.activityDivider]}>
-                <View style={[styles.activityDot, { backgroundColor: e.direction === "DEBIT" ? colors.rust : colors.teal }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.activityTitle} numberOfLines={1}>{e.description}</Text>
-                  <Text style={styles.activityDate}>{new Date(e.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" })}</Text>
-                </View>
-                <Text style={[styles.activityAmount, { color: e.direction === "DEBIT" ? colors.rust : colors.teal }]}>
-                  {formatINR(e.direction === "DEBIT" ? -e.amountPaise / 100 : e.amountPaise / 100, { sign: true })}
-                </Text>
+          <SectionTitle actionLabel="All notices →" onAction={() => go(navigation, "Services", "Announcements")}>Company notice</SectionTitle>
+          <PressScale onPress={() => go(navigation, "Services", "Announcements")}>
+            <Card delay={180} style={topNotice.pinned ? styles.noticePinned : undefined}>
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                <Ionicons name={topNotice.pinned ? "pin" : "megaphone-outline"} size={16} color={colors.amber600} />
+                <Text style={styles.noticeTitle}>{topNotice.title}</Text>
               </View>
-            ))}
-          </Card>
+              <Text style={styles.noticeBody} numberOfLines={2}>{topNotice.body}</Text>
+            </Card>
+          </PressScale>
         </>
       )}
+
+      {/* Quick actions */}
+      <SectionTitle>Quick actions</SectionTitle>
+      <View style={styles.actions}>
+        <ActionTile delay={200} label="Attendance" icon="calendar-outline" tint={colors.teal} onPress={() => navigation.navigate("Attendance")} />
+        <ActionTile delay={230} label="Advance" icon="cash-outline" tint={colors.amber} onPress={() => go(navigation, "Services", "RequestAdvance")} />
+        <ActionTile delay={260} label="Kharchi" icon="receipt-outline" tint={colors.rust} onPress={() => go(navigation, "Services", "RequestKharchi")} />
+        <ActionTile delay={290} label="Leave" icon="airplane-outline" tint={colors.violet} onPress={() => go(navigation, "Services", "Leave")} />
+        <ActionTile delay={320} label="Documents" icon="document-text-outline" tint={colors.sky} onPress={() => go(navigation, "Services", "WorkerDocuments")} />
+        <ActionTile delay={350} label="ID Card" icon="id-card-outline" tint={colors.gold} onPress={() => go(navigation, "Home", "IdCard")} />
+        <ActionTile delay={380} label="Notices" icon="megaphone-outline" tint={colors.teal} onPress={() => go(navigation, "Services", "Announcements")} />
+        <ActionTile delay={410} label="Support" icon="chatbubbles-outline" tint={colors.graphite700} onPress={() => go(navigation, "Services", "Support")} />
+      </View>
+
+      <Text style={styles.footnote}>Attendance is marked by your Manager/Admin only. Salary updates live as attendance, advance and kharchi are posted.</Text>
+      <View style={{ height: spacing.xl }} />
     </ScrollView>
+  );
+}
+
+function HeroStat({ label, value }) {
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={styles.heroStatValue} numberOfLines={1}>{value}</Text>
+      <Text style={styles.heroStatLabel}>{label}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  header: { flexDirection: "row", alignItems: "center", marginBottom: spacing.md },
-  greet: { fontSize: 20, fontWeight: "700", color: colors.graphite900 },
+  content: { padding: spacing.lg },
+  header: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.md },
+  greet: { fontSize: 17, fontWeight: "800", color: colors.graphite900 },
   date: { fontSize: 12, color: colors.graphite500, marginTop: 2 },
   bell: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", ...shadow.soft },
   banner: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.md, backgroundColor: colors.amber50, borderColor: colors.amber },
   bannerRust: { backgroundColor: colors.rust50, borderColor: colors.rust },
   bannerTitle: { fontSize: 14, fontWeight: "700", color: colors.graphite900 },
   bannerBody: { fontSize: 12, color: colors.graphite700, marginTop: 2 },
-  hero: { borderRadius: radius.xl, padding: spacing.xl, ...shadow.lifted },
   heroTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  heroKicker: { fontSize: 12, color: "rgba(255,255,255,0.7)", fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
-  liveDot: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(42,156,143,0.2)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
+  heroKicker: { fontSize: 12, color: "rgba(255,255,255,0.7)", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6 },
+  liveDot: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(42,156,143,0.22)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   liveDotInner: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.tealBright },
-  liveText: { fontSize: 10, fontWeight: "700", color: colors.tealBright, letterSpacing: 0.8 },
+  liveText: { fontSize: 10, fontWeight: "800", color: colors.tealBright, letterSpacing: 0.8 },
   heroAmount: { fontSize: 38, fontWeight: "800", color: colors.white, marginTop: spacing.sm, fontVariant: ["tabular-nums"] },
-  heroFormula: { fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4 },
+  heroFormula: { fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: spacing.sm },
   heroHint: { fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 6 },
-  pendingRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: radius.md, backgroundColor: colors.amber50 },
-  pendingText: { flex: 1, fontSize: 12, color: colors.amber600, fontWeight: "600" },
-  row: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
-  halfCard: { flex: 1, marginBottom: 0 },
-  label: { fontSize: 12, color: colors.graphite500, marginBottom: 6 },
-  value: { fontSize: 15, fontWeight: "600", color: colors.graphite900 },
-  sub: { fontSize: 12, color: colors.graphite500, marginTop: 6 },
-  sectionLabel: { fontSize: 12, fontWeight: "700", color: colors.graphite500, textTransform: "uppercase", marginTop: spacing.lg, marginBottom: spacing.sm },
-  actions: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -spacing.xs },
-  actionWrap: { width: "25%", paddingHorizontal: spacing.xs },
-  action: { backgroundColor: colors.surface, borderRadius: radius.lg, paddingVertical: spacing.md, alignItems: "center", gap: 6 },
-  actionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  actionLabel: { fontSize: 11, fontWeight: "600", color: colors.graphite900 },
-  activityRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md },
-  activityDivider: { borderTopWidth: 1, borderTopColor: colors.steel100 },
-  activityDot: { width: 8, height: 8, borderRadius: 4 },
-  activityTitle: { fontSize: 13, fontWeight: "600", color: colors.graphite900 },
-  activityDate: { fontSize: 11, color: colors.graphite500, marginTop: 2 },
-  activityAmount: { fontSize: 13, fontWeight: "700" }
+  heroStats: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 14, padding: spacing.md },
+  heroStatValue: { fontSize: 14, fontWeight: "800", color: colors.white },
+  heroStatLabel: { fontSize: 10, color: "rgba(255,255,255,0.55)", marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 },
+  tileRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
+  chartHint: { fontSize: 11, color: colors.graphite300, marginTop: 8 },
+  noticePinned: { borderWidth: 1.5, borderColor: colors.amber },
+  noticeTitle: { flex: 1, fontSize: 14, fontWeight: "800", color: colors.graphite900 },
+  noticeBody: { fontSize: 12, color: colors.graphite500, marginTop: 6, lineHeight: 17 },
+  actions: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4 },
+  footnote: { fontSize: 11, color: colors.graphite300, textAlign: "center", marginTop: spacing.lg, lineHeight: 16 }
 });

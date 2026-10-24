@@ -455,3 +455,32 @@ bookmarkable and shareable.
   `SalaryPaymentReceipt` record. (Image→text itself is client-side; the
   parser is the deterministic, unit-tested part and a server OCR engine can
   be plugged in front of `parseReceiptText` later.)
+
+## Mobile app redesign + Company features (latest)
+
+**Modern mobile UX (Worker / Manager / Admin)**
+- Bottom-tab navigation with a floating dark tab bar and springy active pill:
+  Worker = Home · Attendance · Salary · Services; Manager/Admin = Home ·
+  Workers · Mark · Finance · More. Haptic feedback on tabs and presses.
+- New design system (`apps/mobile/src/components/design.jsx`): gradient hero
+  panels, gradient initial avatars, stat tiles, action tiles, menu rows,
+  an animated daily-earnings bar chart, and a month **attendance calendar**
+  (status colours, holiday markers, tap-a-day detail, month summary).
+- Worker Home: gradient salary hero (today / approx-month / per-day stats),
+  animated last-days earnings chart, latest company notice, 8 quick actions.
+- Worker Salary: chart + **Share salary summary** (shareable payslip text).
+- Digital **ID Card** screen (site-gate card with employee ID, site, role).
+- Login and Manager Home got matching gradient/branding polish.
+
+**New Admin-controlled features (`/api/v1/company`, Admin Web → Communication → "Announcements, Holidays & Leave")**
+- **Announcements**: Admin publishes/pins/deletes notices for ALL / WORKERS /
+  MANAGERS (`announcement.manage`); they appear on the app home + notice
+  board. Admin can also publish from the mobile Admin app.
+- **Holidays**: Admin sets company holidays (`holiday.manage`); shown on
+  every worker's attendance calendar.
+- **Leave requests**: Worker requests PAID/UNPAID leave in the app
+  (`leave.create`); Manager (own site) or Admin approves (`leave.approve`) —
+  approval automatically creates the attendance records through the normal
+  pipeline, so paid leave credits salary exactly like manager-marked leave,
+  and the worker is notified. Manageable from Admin Web and mobile.
+- New permissions are auto-synced into existing databases on API boot.

@@ -311,6 +311,27 @@ const PERMISSIONS = exports.PERMISSIONS = [
   group: "Notification",
   description: "Manage notification settings"
 },
+{
+  key: "announcement.read",
+  group: "Communication",
+  description: "View company announcements and holidays"
+}, {
+  key: "announcement.manage",
+  group: "Communication",
+  description: "Create/edit company announcements (Admin)"
+}, {
+  key: "holiday.manage",
+  group: "Communication",
+  description: "Add/remove company holidays (Admin)"
+}, {
+  key: "leave.create",
+  group: "Leave",
+  description: "Request leave (worker)"
+}, {
+  key: "leave.approve",
+  group: "Leave",
+  description: "Approve/reject worker leave requests"
+},
 // Permissions themselves
 {
   key: "permission.manage",
@@ -323,6 +344,6 @@ const PERMISSION_KEYS = exports.PERMISSION_KEYS = PERMISSIONS.map(p => p.key);
 const DEFAULT_ROLE_PERMISSIONS = exports.DEFAULT_ROLE_PERMISSIONS = {
   SUPER_ADMIN: PERMISSION_KEYS,
   // full access
-  MANAGER: ["worker.create", "worker.read", "attendance.create", "attendance.read", "advance.create", "advance.read", "kharchi.create", "kharchi.read", "site.read", "support.chat", "company.expense.read", "supplier.read", "material.read", "material.issue", "equipment.read", "equipment.assign", "diary.create", "diary.read", "diary.update", "financialReports.read", "salary.read", "salary.rate.manage"],
-  WORKER: ["worker.read", "attendance.read", "salary.read", "advance.create", "advance.read", "kharchi.create", "kharchi.read", "support.chat"]
+  MANAGER: ["worker.create", "worker.read", "attendance.create", "attendance.read", "advance.create", "advance.read", "kharchi.create", "kharchi.read", "site.read", "support.chat", "company.expense.read", "supplier.read", "material.read", "material.issue", "equipment.read", "equipment.assign", "diary.create", "diary.read", "diary.update", "financialReports.read", "salary.read", "salary.rate.manage", "announcement.read", "leave.approve"],
+  WORKER: ["worker.read", "attendance.read", "salary.read", "advance.create", "advance.read", "kharchi.create", "kharchi.read", "support.chat", "announcement.read", "leave.create"]
 };

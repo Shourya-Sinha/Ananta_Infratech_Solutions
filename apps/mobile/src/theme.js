@@ -1,5 +1,5 @@
 export const colors = {
-  paper: "#F3F5F7",
+  paper: "#EEF2F7",
   surface: "#FFFFFF",
   graphite900: "#14181D",
   graphite700: "#2B323B",
@@ -19,10 +19,21 @@ export const colors = {
   white: "#FFFFFF",
 };
 
+// Brand extensions (keys above are unchanged for backward compatibility).
+colors.navy = "#0B1220";
+colors.navyLight = "#16283F";
+colors.gold = "#E8A33D";
+colors.sky = "#3E7CB1";
+colors.violet = "#6C5CE7";
+
 export const gradients = {
   amber: [colors.amberBright, colors.amber],
   night: ["#1B2027", colors.graphite900],
   teal: [colors.tealBright, colors.teal],
+  // Deep navy → steel blue → teal. The company "hero" gradient.
+  hero: ["#0B1220", "#16283F", "#14524B"],
+  gold: ["#F2B95C", "#C97A1F"],
+  cardDark: ["#182233", "#0B1220"],
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
