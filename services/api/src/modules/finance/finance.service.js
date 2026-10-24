@@ -307,6 +307,120 @@ exports.FinanceService = {
     if (dateFilter.date) match.date = dateFilter.date;
     return match;
   },
+  /** Admin sets the client billing for one site + month (e.g. ₹2,00,000). */
+  async setSiteBilling(input, actorId) {
+    const site = await _Site.Site.findById(input.siteId);
+    if (!site) throw _AppError.AppError.notFound("Site not found");
+    const billing = await _Finance.SiteBilling.findOneAndUpdate({
+      site: site._id,
+      month: input.month
+    }, {
+      billedAmountPaise: (0, _utils.rupeesToPaise)(input.billedAmountRupees),
+      ...(input.receivedAmountRupees !== undefined ? { receivedAmountPaise: (0, _utils.rupeesToPaise)(input.receivedAmountRupees) } : {}),
+      note: input.note,
+      updatedBy: actorId
+    }, { upsert: true, new: true });
+    await _audit.AuditService.log({
+      actor: actorId,
+      action: "SITE_BILLING_SET",
+      targetType: "SiteBilling",
+      targetId: billing._id.toString(),
+      after: { site: site._id.toString(), month: input.month, billedAmountRupees: input.billedAmountRupees, receivedAmountRupees: input.receivedAmountRupees }
+    });
+    return billing;
+  },
+  async getSiteBilling(siteId, month) {
+    return _Finance.SiteBilling.findOne({ site: siteId, month });
+  },
+  /**
+   * Per-site monthly dashboard — the "is this project making money today?"
+   * view. Billing (what the owner is billed this month) vs every cost of the
+   * site for the month: worker gross salary earned on the site, of which
+   * advances + Kharchi already paid out in cash, other site expenses, and
+   * admin investment. Advance/Kharchi are shown inside salary (they are
+   * deducted from it) — never added on top, or the site cost double-counts.
+   * `approximate` projects the month-end position from the daily burn so
+   * far, so profit/loss can be watched every day, not only at month end.
+   */
+  async getSiteDashboard(siteId, month) {
+    const site = await _Site.Site.findById(siteId);
+    if (!site) throw _AppError.AppError.notFound("Site not found");
+    const [yearStr, monthStr] = month.split("-");
+    const year = Number(yearStr);
+    const monthIndex = Number(monthStr) - 1;
+    const from = `${month}-01`;
+    const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+    const to = `${month}-${String(lastDay).padStart(2, "0")}`;
+    const filter = { from, to };
+    const [pnl, billing] = await Promise.all([this.getSiteProfitLoss(siteId, filter), this.getSiteBilling(siteId, month)]);
+    const billedPaise = billing?.billedAmountPaise ?? 0;
+    const receivedPaise = billing?.receivedAmountPaise ?? 0;
+    const labourPaise = Math.round((pnl.labourCost ?? 0) * 100);
+    const workerPayoutPaise = Math.round((pnl.workerPayouts ?? 0) * 100);
+    const otherExpensePaise = Math.round((pnl.materialAndOtherExpenses ?? 0) * 100);
+    const investmentPaise = Math.round((pnl.investment ?? 0) * 100);
+    const totalCostPaise = (0, _utils.addPaise)(labourPaise, otherExpensePaise);
+    // Elapsed calendar days of this month (IST) for the daily approximation.
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const isCurrentMonth = nowIST.getFullYear() === year && nowIST.getMonth() === monthIndex;
+    const elapsedDays = isCurrentMonth ? nowIST.getDate() : lastDay;
+    const dailyCostPaise = elapsedDays > 0 ? Math.round(totalCostPaise / elapsedDays) : 0;
+    const projectedCostPaise = dailyCostPaise * lastDay;
+    const toRupees = _utils.paiseToRupees;
+    return {
+      siteId,
+      siteName: site.name,
+      month,
+      billing: {
+        billed: toRupees(billedPaise),
+        received: toRupees(receivedPaise),
+        pending: toRupees(Math.max(0, billedPaise - receivedPaise))
+      },
+      costs: {
+        workerSalaryGross: toRupees(labourPaise),
+        advancesAndKharchiPaidOut: toRupees(workerPayoutPaise), // part of the salary above, already paid in cash
+        salaryStillPayable: toRupees(Math.max(0, labourPaise - workerPayoutPaise)),
+        otherSiteExpenses: toRupees(otherExpensePaise),
+        adminInvestment: toRupees(investmentPaise),
+        totalCost: toRupees(totalCostPaise)
+      },
+      profitLoss: {
+        // Against the bill raised with the project owner…
+        onBilled: toRupees(billedPaise - totalCostPaise),
+        // …and against cash actually received from them.
+        onReceived: toRupees(receivedPaise - totalCostPaise),
+        afterInvestmentRecovery: toRupees(billedPaise - totalCostPaise - investmentPaise)
+      },
+      approximate: {
+        elapsedDays,
+        daysInMonth: lastDay,
+        averageDailyCost: toRupees(dailyCostPaise),
+        projectedMonthCost: toRupees(projectedCostPaise),
+        projectedProfitLossOnBilled: toRupees(billedPaise - projectedCostPaise)
+      },
+      recordedIncome: pnl.income,
+      recordedProfitLoss: pnl.profitLoss
+    };
+  },
+  /** Company overview: every site's dashboard row + gross totals for a month. */
+  async getCompanyDashboard(month) {
+    const sites = await _Site.Site.find({}).select("_id name");
+    const rows = [];
+    for (const site of sites) rows.push(await this.getSiteDashboard(site._id.toString(), month));
+    const sum = (pick) => Math.round(rows.reduce((acc, r) => acc + pick(r), 0) * 100) / 100;
+    return {
+      month,
+      sites: rows,
+      gross: {
+        billed: sum((r) => r.billing.billed),
+        received: sum((r) => r.billing.received),
+        totalCost: sum((r) => r.costs.totalCost),
+        adminInvestment: sum((r) => r.costs.adminInvestment),
+        profitLossOnBilled: sum((r) => r.profitLoss.onBilled),
+        profitLossOnReceived: sum((r) => r.profitLoss.onReceived)
+      }
+    };
+  },
   async getSiteProfitLoss(siteId, filter) {
     const site = await _Site.Site.findById(siteId);
     if (!site) throw _AppError.AppError.notFound("Site not found");

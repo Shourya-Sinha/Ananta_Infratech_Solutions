@@ -274,6 +274,8 @@ export function FinancePage() {
 
       <FinanceExportBar />
 
+      {site && <SiteBillingCard siteId={site} />}
+
       {summaryLoading ? (
         <div className="card animate-pulse p-4 text-sm text-graphite-300">Loading company summary…</div>
       ) : totals && (
@@ -505,6 +507,58 @@ export function FinancePage() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Monthly billing vs cost for the selected site: Admin sets what the project
+ * owner is billed this month (and what has been received); the API returns
+ * billing − (worker salary + other expenses), the daily average cost and the
+ * projected month-end profit/loss. Advance/Kharchi paid out are shown inside
+ * salary (they are deducted from it), never added on top.
+ */
+function SiteBillingCard({ siteId }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const month = new Date().toISOString().slice(0, 7);
+  const [billed, setBilled] = useState("");
+  const [received, setReceived] = useState("");
+  const { data: dash } = useQuery({
+    queryKey: ["finance", "site-dashboard", siteId, month],
+    queryFn: async () => unwrap(api.get(`/finance/site/${siteId}/dashboard?month=${month}`)),
+    enabled: Boolean(siteId)
+  });
+  const save = useMutation({
+    mutationFn: async () =>
+      unwrap(api.put("/finance/site-billing", {
+        siteId, month,
+        billedAmountRupees: Number(billed),
+        receivedAmountRupees: received === "" ? undefined : Number(received)
+      })),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["finance"] }); toast.success("Monthly billing saved."); },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not save billing.")
+  });
+  if (!dash) return null;
+  const pl = dash.profitLoss.onBilled;
+  return (
+    <div className="card space-y-3 p-4">
+      <p className="font-display text-xs font-semibold uppercase tracking-wide text-graphite-500">
+        Monthly billing &amp; profit/loss — {dash.siteName} ({month})
+      </p>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <KpiCard label="Billed to owner" value={formatINR(dash.billing.billed)} sublabel={`Received ${formatINR(dash.billing.received)} · pending ${formatINR(dash.billing.pending)}`} />
+        <KpiCard label="Worker salary (gross)" value={formatINR(dash.costs.workerSalaryGross)} sublabel={`Advance+Kharchi paid ${formatINR(dash.costs.advancesAndKharchiPaidOut)} · still payable ${formatINR(dash.costs.salaryStillPayable)}`} tone="negative" />
+        <KpiCard label="Total cost" value={formatINR(dash.costs.totalCost)} sublabel={`Other expenses ${formatINR(dash.costs.otherSiteExpenses)} · investment ${formatINR(dash.costs.adminInvestment)}`} tone="negative" />
+        <KpiCard label="Profit / loss" value={formatINR(pl)} sublabel={`~${formatINR(dash.approximate.averageDailyCost)}/day · projected ${formatINR(dash.approximate.projectedProfitLossOnBilled)}`} tone={pl >= 0 ? "positive" : "negative"} />
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <input className="input max-w-[220px]" type="number" min="0" placeholder="This month's billing ₹" value={billed} onChange={(e) => setBilled(e.target.value)} />
+        <input className="input max-w-[220px]" type="number" min="0" placeholder="Received ₹ (optional)" value={received} onChange={(e) => setReceived(e.target.value)} />
+        <button className="btn-accent" disabled={save.isPending || billed === ""} onClick={() => save.mutate()}>
+          {save.isPending ? "Saving…" : "Set billing"}
+        </button>
+      </div>
     </div>
   );
 }

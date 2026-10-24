@@ -50,6 +50,35 @@ const workerProfileSchema = new _mongoose.Schema({
     ref: "WorkType",
     index: true
   },
+  // Individual pay rate set by Admin/Manager. Admin sets ONE basis
+  // (salaryMode) + its amount; hourly/daily/monthly equivalents are always
+  // derived by @ananta/utils deriveSalaryRates — never trust a client-sent
+  // conversion. When all three are empty the work-type default daily rate
+  // applies. Changing the rate only affects attendance posted AFTER the
+  // change (past ledger entries are immutable history).
+  salaryMode: {
+    type: String,
+    enum: ["HOURLY", "DAILY", "MONTHLY"]
+  },
+  hourlyRatePaise: {
+    type: Number,
+    min: 0
+  },
+  dailyRatePaise: {
+    type: Number,
+    min: 0
+  },
+  monthlySalaryPaise: {
+    type: Number,
+    min: 0
+  },
+  salaryRateUpdatedBy: {
+    type: _mongoose.Types.ObjectId,
+    ref: "User"
+  },
+  salaryRateUpdatedAt: {
+    type: Date
+  },
   currentSite: {
     type: _mongoose.Types.ObjectId,
     ref: "Site",

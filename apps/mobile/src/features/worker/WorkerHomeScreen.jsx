@@ -8,7 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, Badge } from "@/components/ui";
 import { CountUp, PressScale, ProgressBar, formatINR } from "@/components/interactive";
 import { useAuthStore } from "@/stores/authStore";
-import { useMyProfile, useMyAttendance, useMyStatement } from "./api";
+import { useMyProfile, useMyAttendance, useMyStatement, useMySalaryPreview } from "./api";
 import { currentMonthKey, monthLabel, greeting, todayKeyIST, toRupeeView } from "@/lib/salaryDisplay";
 import { colors, spacing, radius, shadow } from "@/theme";
 
@@ -30,6 +30,7 @@ export function WorkerHomeScreen() {
   const today = todayKeyIST();
   const { data: attendance, refetch: refetchAttendance } = useMyAttendance(today, today);
   const { data: statement, refetch: refetchStatement } = useMyStatement(month);
+  const { data: preview } = useMySalaryPreview(month);
   const pay = toRupeeView(statement);
   const todayRecord = attendance?.[0];
   const recent = (pay?.daily ?? []).flatMap((d) => d.entries.map((e) => ({ ...e, date: d.date }))).slice(0, 4);
@@ -133,12 +134,30 @@ export function WorkerHomeScreen() {
             <Text style={styles.value}>Not marked</Text>
           )}
           <Text style={styles.sub}>{todayRecord?.hoursWorked ?? 0}h worked</Text>
+          <Text style={styles.sub}>
+            Today salary: {formatINR((preview?.today.netPaise ?? 0) / 100)}
+            {todayRecord ? "" : " · marked by your manager"}
+          </Text>
         </Card>
         <Card style={styles.halfCard} delay={160}>
           <Text style={styles.label}>Assigned site</Text>
           <Text style={styles.value} numberOfLines={2}>{profile?.currentSite?.name ?? "Not assigned yet"}</Text>
         </Card>
       </View>
+
+      {preview && (
+        <Card delay={200} style={{ marginTop: spacing.md }}>
+          <Text style={styles.label}>Your salary rate</Text>
+          <Text style={styles.value}>
+            {formatINR(preview.rates.hourlyRatePaise / 100)}/hr · {formatINR(preview.rates.dailyRatePaise / 100)}/day ·{" "}
+            {formatINR(preview.rates.monthlySalaryPaise / 100)}/month
+          </Text>
+          <Text style={styles.sub}>
+            Approx monthly salary: {formatINR(preview.approximateMonthlyNetPaise / 100)} net (after advance/Kharchi deducted so
+            far) · Attendance is marked by your manager/admin — you cannot mark it yourself.
+          </Text>
+        </Card>
+      )}
 
       <Text style={styles.sectionLabel}>Quick actions</Text>
       <View style={styles.actions}>

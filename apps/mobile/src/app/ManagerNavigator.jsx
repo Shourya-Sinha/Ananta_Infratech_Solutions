@@ -5,6 +5,8 @@ import { MarkAttendanceScreen } from "@/features/manager/MarkAttendanceScreen";
 import { AddWorkerScreen } from "@/features/manager/AddWorkerScreen";
 import { SubmitAdvanceScreen } from "@/features/manager/SubmitAdvanceScreen";
 import { SubmitKharchiScreen } from "@/features/manager/SubmitKharchiScreen";
+import { SetSalaryRateScreen } from "@/features/manager/SetSalaryRateScreen";
+import { SiteFinanceScreen } from "@/features/manager/SiteFinanceScreen";
 import { NotificationsScreen } from "@/features/shared/NotificationsScreen";
 import { SupportScreen } from "@/features/shared/SupportScreen";
 import { ProfileScreen } from "@/features/shared/ProfileScreen";
@@ -28,6 +30,8 @@ export function ManagerNavigator() {
       <Stack.Screen name="AddWorker" component={AddWorkerScreen} options={{ title: "Add Worker" }} />
       <Stack.Screen name="SubmitAdvance" component={SubmitAdvanceScreen} options={{ title: "Request Advance" }} />
       <Stack.Screen name="SubmitKharchi" component={SubmitKharchiScreen} options={{ title: "Request Kharchi" }} />
+      <Stack.Screen name="SetSalaryRate" component={SetSalaryRateScreen} options={{ title: "Set Salary Rate" }} />
+      <Stack.Screen name="SiteFinance" component={SiteFinanceScreen} options={{ title: "Site Finance" }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Notifications" }} />
       <Stack.Screen name="Support" component={SupportScreen} options={{ title: "Support" }} />
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />

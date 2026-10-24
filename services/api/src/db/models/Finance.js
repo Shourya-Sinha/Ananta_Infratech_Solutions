@@ -257,3 +257,20 @@ const siteDiarySchema = new _mongoose.Schema({
 }, { timestamps: true });
 siteDiarySchema.index({ site: 1, date: -1 });
 const SiteDiary = exports.SiteDiary = (0, _mongoose.model)("SiteDiary", siteDiarySchema);
+
+// ---------------- SITE MONTHLY BILLING (client bill for a project) --------
+// What the admin bills the project owner for one site + month (e.g. ₹2,00,000
+// for October) and how much of it has actually been received. This is the
+// "income return" side of the per-site profit/loss: billing − (worker salary
+// + advances/kharchi already paid out of that salary + other site expenses +
+// investment recovery) shows whether the site is in profit or loss.
+const siteBillingSchema = new _mongoose.Schema({
+  site: { type: _mongoose.Types.ObjectId, ref: "Site", required: true, index: true },
+  month: { type: String, required: true }, // "YYYY-MM"
+  billedAmountPaise: { type: Number, required: true, min: 0 },
+  receivedAmountPaise: { type: Number, default: 0, min: 0 },
+  note: { type: String, trim: true, maxlength: 500 },
+  updatedBy: { type: _mongoose.Types.ObjectId, ref: "User", required: true }
+}, { timestamps: true });
+siteBillingSchema.index({ site: 1, month: 1 }, { unique: true });
+const SiteBilling = exports.SiteBilling = (0, _mongoose.model)("SiteBilling", siteBillingSchema);

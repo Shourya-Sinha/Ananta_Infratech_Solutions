@@ -83,7 +83,7 @@ describe("buildFinancialExport", () => {
     expect(w1.labourPaise).toBe(80_000);
     expect(w1.advancePaise).toBe(20_000);
     expect(w1.kharchiPaise).toBe(5_000);
-    expect(w1.totalPaise).toBe(1_05_000);
+    expect(w1.totalPaise).toBe(80_000); // gross salary only — advance/Kharchi are paid out of it, not on top
     expect(w1.siteNames).toBe("Alpha Yard, Beta Bridge");
     // Overtime is counted. The attendance reversal is not, so it does not reduce the total.
     expect(w2.totalPaise).toBe(30_000);
@@ -92,23 +92,23 @@ describe("buildFinancialExport", () => {
 
     const alpha = report.sites.find((site) => site.siteCode === "ALP");
     const beta = report.sites.find((site) => site.siteCode === "BET");
-    expect(alpha.workerExpensesPaise).toBe(1_30_000);
+    expect(alpha.workerExpensesPaise).toBe(1_10_000); // labour only (was 1,30,000 with payouts double-counted)
     expect(alpha.incomePaise).toBe(5_00_000);
     expect(alpha.investmentPaise).toBe(80_000);
     expect(alpha.materialPaise).toBe(50_000);
     expect(alpha.workers.map((worker) => worker.employeeId).sort()).toEqual(["EMP-1", "EMP-2"]);
-    expect(beta.workerExpensesPaise).toBe(5_000);
+    expect(beta.workerExpensesPaise).toBe(0); // only a payout, no gross salary in period
     expect(beta.incomePaise).toBe(0);
     expect(beta.investmentPaise).toBe(50_000);
     expect(beta.workers).toHaveLength(1);
 
-    expect(report.totals.workerExpensesPaise).toBe(1_35_000);
+    expect(report.totals.workerExpensesPaise).toBe(1_10_000);
     expect(report.totals.investmentPaise).toBe(1_30_000);
     expect(report.totals.incomePaise).toBe(5_00_000);
     expect(report.totals.materialPaise).toBe(50_000);
-    expect(report.totals.totalExpensesPaise).toBe(1_85_000);
-    expect(report.totals.grossProfitLossPaise).toBe(3_15_000);
-    expect(report.totals.netPositionPaise).toBe(1_85_000);
+    expect(report.totals.totalExpensesPaise).toBe(1_60_000);
+    expect(report.totals.grossProfitLossPaise).toBe(3_40_000);
+    expect(report.totals.netPositionPaise).toBe(2_10_000);
 
     const gross = computeGrossTotals(report.sites.map((site) => site.finance));
     expect(report.totals.grossProfitLossPaise).toBe(gross.grossProfitLossPaise);
@@ -143,7 +143,7 @@ describe("buildFinancialExport", () => {
     expect(report.workerLines).toHaveLength(1);
     expect(report.workerLinesTruncated).toBe(true);
     expect(report.workerLineCount).toBe(4);
-    expect(report.totals.workerExpensesPaise).toBe(1_35_000);
+    expect(report.totals.workerExpensesPaise).toBe(1_10_000);
   });
 });
 
@@ -174,7 +174,7 @@ describe("renderFinancialExport", () => {
     const pdfText = pdf.buffer.toString("latin1");
     for (const title of titles) expect(pdfText).toContain(title);
     expect(pdfText).toContain("O'Brien & Sons");
-    expect(pdfText).toContain("Rs 1,350.00");
+    expect(pdfText).toContain("Rs 1,100.00"); // worker expenses = gross salary only (no payout double-count)
 
     const docText = doc.buffer.toString("utf8");
     expect(docText).toContain("<html");
@@ -195,7 +195,7 @@ describe("renderFinancialExport", () => {
     expect(xlsText).toContain("O&apos;Brien &amp; Sons");
     expect(xlsText).toContain("राम");
     expect(xlsText).toContain(">5000.00<");
-    expect(xlsText).toContain(">1350.00<");
+    expect(xlsText).toContain(">1100.00<");
   });
 
   test("an empty export still names every section", () => {

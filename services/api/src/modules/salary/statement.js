@@ -77,8 +77,17 @@ function buildStatement({
       case "KHARCHI_DEDUCTION":
         kharchiDeductionsPaise = (0, _utils.addPaise)(kharchiDeductionsPaise, debit);
         break;
+      case "REVERSAL": {
+        // Cancels a previously counted earning (attendance corrected/deleted)
+        // — net it from gross/overtime, do not inflate "other deductions".
+        let remaining = Math.max(0, debit - credit);
+        const fromGross = Math.min(grossEarningsPaise, remaining);
+        grossEarningsPaise -= fromGross;
+        remaining -= fromGross;
+        overtimeEarningsPaise = Math.max(0, overtimeEarningsPaise - remaining);
+        break;
+      }
       case "ADJUSTMENT":
-      case "REVERSAL":
         otherDeductionsPaise = (0, _utils.addPaise)(otherDeductionsPaise, debit - credit >= 0 ? debit - credit : 0);
         break;
     }

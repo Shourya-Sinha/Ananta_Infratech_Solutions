@@ -59,6 +59,8 @@ export function ManagerHomeScreen() {
         <ActionButton label="Add worker" onPress={() => navigation.navigate("AddWorker")} />
         <ActionButton label="Request advance" onPress={() => navigation.navigate("SubmitAdvance")} />
         <ActionButton label="Request Kharchi" onPress={() => navigation.navigate("SubmitKharchi")} />
+        <ActionButton label="Set salary rate" onPress={() => navigation.navigate("SetSalaryRate")} />
+        <ActionButton label="Site finance" onPress={() => navigation.navigate("SiteFinance")} />
       </View>
     </ScrollView>);
 

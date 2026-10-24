@@ -12,6 +12,11 @@ const attendanceCreateSchema = exports.attendanceCreateSchema = _zod.z.object({
   status: _zod.z.enum(_sharedTypes.ATTENDANCE_STATUS),
   hoursWorked: _zod.z.number().min(0, "hoursWorked cannot be negative").max(24, "hoursWorked cannot exceed 24").default(0),
   overtimeHours: _zod.z.number().min(0, "overtimeHours cannot be negative").max(24, "overtimeHours cannot exceed 24").default(0)
+}).refine((v) => v.hoursWorked + v.overtimeHours <= 24, {
+  // hoursWorked is REGULAR hours and overtimeHours is on top of it; together
+  // they can never exceed a calendar day (prevents double-counted salary).
+  message: "hoursWorked + overtimeHours cannot exceed 24",
+  path: ["overtimeHours"]
 });
 const attendanceBulkSchema = exports.attendanceBulkSchema = _zod.z.object({
   site: _zod.z.string().min(1),

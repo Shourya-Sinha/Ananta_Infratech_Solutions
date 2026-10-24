@@ -27,14 +27,31 @@ exports.AttendanceService = {
    * 8. (notification emission happens in the caller for bulk-friendliness)
    */
   async record(input, actorId, actorRole) {
+    // HARD RBAC RULE (not just a permission key): a WORKER can never mark
+    // attendance — not their own, not anyone else's — even if a custom role
+    // is mistakenly granted attendance.create. Only MANAGER (own site) and
+    // SUPER_ADMIN (any site) record attendance.
+    if (actorRole === "WORKER") {
+      throw _AppError.AppError.forbidden("Workers cannot mark attendance. Your manager or admin marks it for you.");
+    }
     const [profile, site] = await Promise.all([_WorkerProfile.WorkerProfile.findById(input.worker), _Site.Site.findById(input.site)]);
     if (!profile) throw _AppError.AppError.notFound("Worker not found");
     if (!site) throw _AppError.AppError.notFound("Site not found");
+    if (profile.user?.toString() === actorId) {
+      throw _AppError.AppError.forbidden("You cannot mark your own attendance.");
+    }
     if (profile.verificationStatus !== "ACTIVE") {
       throw _AppError.AppError.validation("Attendance can only be recorded for ACTIVE (verified) workers.");
     }
-    if (actorRole === "MANAGER" && site.manager?.toString() !== actorId) {
-      throw _AppError.AppError.forbidden("You don't manage this site.");
+    if (actorRole === "MANAGER") {
+      if (site.manager?.toString() !== actorId) {
+        throw _AppError.AppError.forbidden("You don't manage this site.");
+      }
+      // The worker must actually belong to this site — a manager cannot pull
+      // another site's worker into their register (and their salary ledger).
+      if (!profile.currentSite || profile.currentSite.toString() !== site._id.toString()) {
+        throw _AppError.AppError.forbidden("This worker is not assigned to your site.");
+      }
     }
     const date = normalizeDate(input.date);
     const existing = await _Attendance.Attendance.findOne({
@@ -70,9 +87,9 @@ exports.AttendanceService = {
     });
     const salaryResult = await _salary.SalaryService.postDailyEarning(attendance, actorId);
     const month = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-    if (salaryResult.posted) {
-      await _salary.SalaryService.recalculateMonth(profile._id.toString(), month);
-    }
+    // Always refresh the rollup — even an ABSENT day (no earning posted)
+    // changes the month's day counts shown on the payroll sheet.
+    await _salary.SalaryService.recalculateMonth(profile._id.toString(), month).catch(() => {});
     const io = (0, _gateway.getIO)();
     io.to(_sharedTypes.ROOMS.admin()).to(_sharedTypes.ROOMS.site(site._id.toString())).to(_sharedTypes.ROOMS.worker(profile._id.toString())).emit(_sharedTypes.SOCKET_EVENTS.ATTENDANCE_CREATED, {
       attendanceId: attendance._id.toString(),
@@ -120,9 +137,18 @@ exports.AttendanceService = {
    * record referencing correctionOf, requires elevated permission (checked
    * by RBAC middleware), and re-runs salary calculation.
    */
-  async correct(params, actorId) {
+  async correct(params, actorId, actorRole) {
+    if (actorRole === "WORKER") {
+      throw _AppError.AppError.forbidden("Workers cannot correct attendance. Ask your manager or admin.");
+    }
     const original = await _Attendance.Attendance.findById(params.correctionOf);
     if (!original) throw _AppError.AppError.notFound("Original attendance record not found");
+    if (actorRole === "MANAGER") {
+      const site = await _Site.Site.findById(original.site);
+      if (!site || site.manager?.toString() !== actorId) {
+        throw _AppError.AppError.forbidden("You don't manage this site.");
+      }
+    }
     if (original.locked) {
       throw new _AppError.AppError("PAYROLL_LOCKED", "This attendance record's payroll month is finalized. Post a payroll adjustment instead.", 409);
     }

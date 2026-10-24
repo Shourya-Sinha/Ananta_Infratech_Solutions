@@ -381,3 +381,77 @@ Implemented via `KpiCard` gaining an optional `onClick`, plus
 `WorkersListPage`, `SitesListPage`, and `FinancePage` reading their
 initial filter/tab/scope from the URL query string — genuine deep links,
 bookmarkable and shareable.
+
+## Salary, RBAC, Site Finance & Payment Receipts (latest)
+
+**Salary calculation (audited & fixed)**
+- Formula (unchanged, now verified end-to-end): attendance → daily earning
+  `(hours ÷ full-day hours) × daily rate`, overtime beyond the threshold at
+  the overtime multiplier → ledger → monthly rollup
+  `Net = Gross + Overtime − Advance − Kharchi − Other`.
+- Fixed: attendance reversals stored the *pre*-reversal running balance, so
+  the ledger balance never dropped after a correction/delete.
+- Fixed: advance deductions were dated to the *request* date — they now land
+  in the month the money is **paid**; a deduction whose month is already
+  FINALIZED/PAID is carried into the current open month, never silently
+  written into a locked month. Deductions are idempotent per request (a
+  retried approve/pay can never deduct twice).
+- Fixed: reversals now net against gross earnings (not "other deductions"),
+  so the payroll sheet's gross matches the actual attendance.
+- Fixed: `PRESENT` with no hours = full day, `HALF_DAY` with no hours = half
+  day (previously both earned ₹0). `hoursWorked + overtimeHours ≤ 24` enforced.
+- Site finance no longer **double-counts** advance/Kharchi: they are paid out
+  of the worker's gross salary, so site cost = other expenses + gross salary
+  (payouts are still reported separately as cash already paid).
+
+**Per-worker salary rates (hour / day / month)**
+- Manager/Admin sets ONE basis via `PUT /salary/worker/:id/salary-rate`
+  (`salary.rate.manage`); `@ananta/utils deriveSalaryRates` derives the other
+  two (monthly = daily × `WORKING_DAYS_PER_MONTH`, default 26; hourly =
+  daily ÷ full-day hours). Falls back to the work-type daily rate.
+- `GET /salary/worker/:id/preview` and `GET /salary/me/preview` return the
+  derived rates, **today's salary**, month-so-far totals, and the
+  **approximate monthly salary** (projected + for monthly-salaried workers
+  the fixed monthly amount) minus deductions — shown on the worker's home
+  screen and the manager's Set Salary Rate screen. Rate changes only affect
+  attendance posted afterwards.
+
+**RBAC — who can do what**
+- A **worker can never mark or correct attendance** (hard check in the
+  service, not just a permission key) and never their own. **Manager** marks
+  attendance only for workers assigned to a site they manage; **Admin** any
+  site. Attendance delete is Super-Admin only.
+- Mobile: `SUPER_ADMIN` now gets the Admin navigator (previously fell into
+  the worker onboarding flow), Manager gets the Manager navigator, Worker
+  gets the worker app (view-only attendance).
+- Admin Web (`apps/admin-web`) is **Super-Admin only** — `ProtectedRoute`
+  now rejects Worker/Manager accounts with an "Admin access only" screen.
+- New permissions: `salary.rate.manage`, `salary.receipt.manage`,
+  `site.billing.manage` (auto-synced to existing DBs on API boot).
+
+**Per-site finance & monthly billing**
+- Admin sets a site's monthly client billing: `PUT /finance/site-billing`
+  (`{ siteId, month, billedAmountRupees, receivedAmountRupees? }`).
+- `GET /finance/site/:id/dashboard?month=YYYY-MM` (Manager: own site only):
+  billing vs received/pending, worker gross salary, advance+Kharchi already
+  paid out, salary still payable, other expenses, admin investment, profit/
+  loss on billed and on received, plus a **daily approximation** (average
+  cost/day, projected month cost and projected profit/loss).
+  `GET /finance/overview?month=` gives every site + company gross (Admin).
+  Shown in Admin Web Finance (select a site) and the mobile Site Finance
+  screen.
+
+**Salary payment receipts + OCR**
+- After finalizing, Admin marks a worker paid with the UPI/bank receipt:
+  `POST /payroll/:month/workers/:workerId/mark-paid` (multipart: `file`
+  image + `transactionId`, `ocrText`, `note`). The image is stored via
+  ImageKit as a `PAYMENT_PROOF` document; the worker sees the receipt under
+  **Salary → Salary payment receipts** in the mobile app (`GET /salary/me/receipts`).
+- Small OCR extractor (`services/api/src/modules/payroll/receiptOcr.js`):
+  paste the receipt text (from phone OCR) into `POST /payroll/receipts/ocr-preview`
+  — or pass it as `ocrText` with the upload — and it extracts **amount,
+  date, time and UPI transaction ID/UTR** with a confidence score. Both the
+  OCR result and the admin-confirmed values are saved on the
+  `SalaryPaymentReceipt` record. (Image→text itself is client-side; the
+  parser is the deterministic, unit-tested part and a server OCR engine can
+  be plugged in front of `parseReceiptText` later.)

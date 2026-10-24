@@ -90,6 +90,18 @@ const PERMISSIONS = exports.PERMISSIONS = [
   key: "salary.manage",
   group: "Salary",
   description: "Finalize payroll, post adjustments"
+}, {
+  key: "salary.rate.manage",
+  group: "Salary",
+  description: "Set a worker's per-hour / per-day / monthly salary rate"
+}, {
+  key: "salary.receipt.manage",
+  group: "Salary",
+  description: "Upload salary payment receipts (UPI/bank proof) for a worker"
+}, {
+  key: "site.billing.manage",
+  group: "Finance",
+  description: "Set a site's monthly billing (client bill) amount"
 },
 // Advance
 {
@@ -311,6 +323,6 @@ const PERMISSION_KEYS = exports.PERMISSION_KEYS = PERMISSIONS.map(p => p.key);
 const DEFAULT_ROLE_PERMISSIONS = exports.DEFAULT_ROLE_PERMISSIONS = {
   SUPER_ADMIN: PERMISSION_KEYS,
   // full access
-  MANAGER: ["worker.create", "worker.read", "attendance.create", "attendance.read", "advance.create", "advance.read", "kharchi.create", "kharchi.read", "site.read", "support.chat", "company.expense.read", "supplier.read", "material.read", "material.issue", "equipment.read", "equipment.assign", "diary.create", "diary.read", "diary.update", "financialReports.read"],
+  MANAGER: ["worker.create", "worker.read", "attendance.create", "attendance.read", "advance.create", "advance.read", "kharchi.create", "kharchi.read", "site.read", "support.chat", "company.expense.read", "supplier.read", "material.read", "material.issue", "equipment.read", "equipment.assign", "diary.create", "diary.read", "diary.update", "financialReports.read", "salary.read", "salary.rate.manage"],
   WORKER: ["worker.read", "attendance.read", "salary.read", "advance.create", "advance.read", "kharchi.create", "kharchi.read", "support.chat"]
 };

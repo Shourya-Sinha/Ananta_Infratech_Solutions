@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, EmptyState } from "@/components/ui";
 import { CountUp, PressScale, ProgressBar, formatINR } from "@/components/interactive";
-import { useMyStatement } from "./api";
+import { useMyStatement, useMyReceipts } from "./api";
 import { currentMonthKey, monthLabel, toRupeeView } from "@/lib/salaryDisplay";
 import { colors, spacing, radius, shadow } from "@/theme";
 
@@ -23,6 +23,7 @@ export function WorkerSalaryScreen() {
   const qc = useQueryClient();
   const month = currentMonthKey();
   const { data: statement, isLoading, refetch } = useMyStatement(month);
+  const { data: receipts } = useMyReceipts();
   const pay = toRupeeView(statement);
   const [openDay, setOpenDay] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -79,6 +80,24 @@ export function WorkerSalaryScreen() {
         <View style={styles.divider} />
         <BreakdownRow icon="wallet-outline" color={colors.graphite900} label="Net salary" value={pay?.net ?? 0} bold />
       </Card>
+
+      {receipts && receipts.length > 0 && (
+        <>
+          <Text style={styles.sectionLabel}>Salary payment receipts</Text>
+          {receipts.map((r) => (
+            <Card key={r._id} style={{ marginBottom: spacing.sm }}>
+              <Text style={styles.dayDate}>
+                {r.month} · {formatINR(r.amountPaise / 100)} · {r.method}
+              </Text>
+              <Text style={styles.dayMeta}>
+                {r.transactionId ? `Txn/UTR: ${r.transactionId} · ` : ""}
+                {r.paidAt ? new Date(r.paidAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : ""}
+                {r.receiptUrl ? " · Receipt image attached (ask Admin to view)" : ""}
+              </Text>
+            </Card>
+          ))}
+        </>
+      )}
 
       <Text style={styles.sectionLabel}>Day by day</Text>
       {!isLoading && (!pay || pay.daily.length === 0) ? (

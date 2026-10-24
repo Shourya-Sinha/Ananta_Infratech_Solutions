@@ -28,7 +28,13 @@ function computeSiteFinanceRow(partials) {
   const expensePaise = partials.expensePaise ?? 0;
   const labourPaise = partials.labourPaise ?? 0;
   const workerPayoutPaise = partials.workerPayoutPaise ?? 0;
-  const totalExpensesPaise = (0, _utils.addPaise)(expensePaise, labourPaise, workerPayoutPaise);
+  // BUG FIX (double counting): paid advances/Kharchi are deductions FROM the
+  // workers' gross salary — the cash left the company early, but it is part
+  // of labourPaise (gross EARNING/OVERTIME credits), not an expense on top
+  // of it. Counting both overstated every site's cost by the payout total.
+  // workerPayoutPaise is still reported (cash already paid out of salary)
+  // but is NOT added into total expenses again.
+  const totalExpensesPaise = (0, _utils.addPaise)(expensePaise, labourPaise);
   const profitLossPaise = (0, _utils.subtractPaise)(incomePaise, totalExpensesPaise);
   const netPositionPaise = (0, _utils.subtractPaise)(profitLossPaise, investmentPaise);
   return {

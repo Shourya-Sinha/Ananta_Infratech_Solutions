@@ -11,6 +11,8 @@ const DEFAULT_SALARY_RULES = exports.DEFAULT_SALARY_RULES = {
   HALF_DAY_HOURS: 4,
   OVERTIME_START_HOURS: 8,
   // hours beyond this are overtime
+  WORKING_DAYS_PER_MONTH: 26,
+  // paid days used to convert monthly salary ⇄ daily/hourly rate
   OVERTIME_MULTIPLIER: 1.0,
   // 1.0 = paid at straight hourly rate; admin can raise to 1.5 etc.
   ROUNDING_POLICY: "NEAREST_PAISE" // NEAREST_PAISE | ROUND_UP | ROUND_DOWN

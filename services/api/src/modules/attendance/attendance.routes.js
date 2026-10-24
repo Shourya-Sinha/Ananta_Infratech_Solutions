@@ -34,7 +34,7 @@ attendanceRouter.post("/bulk", (0, _rbac.requirePermission)("attendance.create")
 }));
 attendanceRouter.patch("/correction", (0, _rbac.requirePermission)("attendance.update"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   const input = _validation.attendanceCorrectionSchema.parse(req.body);
-  const result = await _attendance.AttendanceService.correct(input, req.auth.userId);
+  const result = await _attendance.AttendanceService.correct(input, req.auth.userId, req.auth.role);
   const body = {
     success: true,
     data: result
@@ -47,7 +47,7 @@ attendanceRouter.patch("/correction", (0, _rbac.requirePermission)("attendance.u
  * recalculated, so payroll always matches the remaining attendance.
  * Blocked (409 PAYROLL_LOCKED) once the month is finalized.
  */
-attendanceRouter.delete("/:id", (0, _rbac.requirePermission)("attendance.delete"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+attendanceRouter.delete("/:id", (0, _rbac.requirePermission)("attendance.delete"), (0, _rbac.requireRole)("SUPER_ADMIN"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   const result = await _attendance.AttendanceService.remove(req.params.id, req.auth.userId);
   const body = {
     success: true,
