@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing } from "react-native-reanimated";
 import { useEffect } from "react";
-import { PressScale } from "./interactive";
+import { PressScale, formatINR } from "./interactive";
 import { colors, spacing, radius, shadow, gradients } from "@/theme";
 
 /** Initials avatar with a deterministic brand gradient. */
@@ -85,55 +85,52 @@ export function MenuRow({ icon, tint = colors.graphite700, label, sub, onPress, 
   );
 }
 
-/** Animated vertical bars for a daily series (e.g. last days of earnings).
- * Every bar shows its amount on top and day + date below in dark, readable
- * text (the old version showed only a faint weekday letter, so users saw a
- * green bar with no numbers). Amounts < ₹1,000 are exact to the paise;
- * larger ones compact to ₹1.5k style (full amounts are in the statement). */
-export function EarningsBars({ data = [], height = 118, color = colors.tealBright, emptyLabel = "No earnings yet" }) {
+/** Daily earnings chart — horizontal rows.
+ * Vertical bar charts squeezed 7-14 thin columns onto a phone screen, so
+ * amount labels above the bars were clipped/invisible on Android (only a
+ * green bar was seen). This row layout can never do that: date on the
+ * left, animated green bar in the middle, and the EXACT amount (paise
+ * included) in bold dark text on the right of every row. */
+export function EarningsBars({ data = [], color = colors.tealBright, emptyLabel = "No earnings yet" }) {
   const max = Math.max(1, ...data.map((d) => Math.abs(d.value ?? 0)));
   if (!data.length) return <Text style={styles.emptyText}>{emptyLabel}</Text>;
-  // With many bars (e.g. 14 on the Salary page) an exact "₹562.50" label
-  // cannot fit above a ~20px column on Android, so dense charts use a
-  // compact chart label — screens pair it with an exact-amount list below.
-  const dense = data.length > 9;
   return (
-    <View style={[styles.bars, { height }]}>
+    <View style={styles.bars}>
       {data.map((d, i) => (
-        <Bar key={d.label ?? i} fraction={Math.abs(d.value ?? 0) / max} label={d.label} sub={d.sub} value={d.value ?? 0} dense={dense} height={height} color={d.value < 0 ? colors.rust : color} index={i} />
+        <BarRow
+          key={`${d.label ?? "day"}-${i}`}
+          fraction={Math.abs(d.value ?? 0) / max}
+          label={d.label}
+          sub={d.sub}
+          value={d.value ?? 0}
+          color={d.value < 0 ? colors.rust : color}
+          index={i}
+        />
       ))}
     </View>
   );
 }
 
-function shortRupee(v, dense = false) {
-  const abs = Math.abs(v);
-  if (abs >= 1000) {
-    const k = abs / 1000;
-    return `${v < 0 ? "\u2212" : ""}\u20B9${k >= 100 ? Math.round(k) : k.toFixed(1).replace(/\.0$/, "")}k`;
-  }
-  if (dense && abs % 1 !== 0) return `${v < 0 ? "\u2212" : ""}\u20B9${Math.round(abs)}`;
-  const exact = abs % 1 === 0 ? String(abs) : abs.toFixed(2);
-  return `${v < 0 ? "\u2212" : ""}\u20B9${exact}`;
-}
-
-function Bar({ fraction, label, sub, value, dense, color, index }) {
-  const h = useSharedValue(0);
+function BarRow({ fraction, label, sub, value, color, index }) {
+  const w = useSharedValue(0);
   useEffect(() => {
-    h.value = withDelay(index * 60, withTiming(Math.max(0.05, fraction), { duration: 650, easing: Easing.out(Easing.cubic) }));
-  }, [fraction, h, index]);
-  const style = useAnimatedStyle(() => ({ height: `${h.value * 100}%` }));
+    w.value = withDelay(index * 55, withTiming(Math.max(0.03, fraction), { duration: 600, easing: Easing.out(Easing.cubic) }));
+  }, [fraction, w, index]);
+  const fillStyle = useAnimatedStyle(() => ({ width: `${w.value * 100}%` }));
   return (
-    <View style={styles.barCol}>
-      <Text style={[styles.barValue, dense && { fontSize: 8 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{shortRupee(value, dense)}</Text>
-      <View style={styles.barTrack}>
-        <Animated.View style={[styles.barFill, style]}>
-          <LinearGradient colors={[color, colors.teal]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.barGradient} />
+    <Animated.View entering={FadeInDown.delay(index * 40).duration(260)} style={styles.barRow}>
+      <Text style={styles.barDate} numberOfLines={1}>
+        {label}{sub ? ` ${sub}` : ""}
+      </Text>
+      <View style={styles.barTrackH}>
+        <Animated.View style={[styles.barFillH, fillStyle]}>
+          <LinearGradient colors={[colors.teal, color]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.barGradientH} />
         </Animated.View>
       </View>
-      {!!label && <Text style={styles.barLabel}>{label}</Text>}
-      {!!sub && <Text style={styles.barSub}>{sub}</Text>}
-    </View>
+      <Text style={[styles.barAmount, { color: value < 0 ? colors.rust : colors.teal }]} numberOfLines={1}>
+        {formatINR(value)}
+      </Text>
+    </Animated.View>
   );
 }
 
@@ -215,14 +212,13 @@ const styles = StyleSheet.create({
   menuIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   menuLabel: { fontSize: 14, fontWeight: "700", color: colors.graphite900 },
   menuSub: { fontSize: 11, color: colors.graphite500, marginTop: 1 },
-  bars: { flexDirection: "row", alignItems: "stretch", gap: 6 },
-  barCol: { flex: 1, alignItems: "center", height: "100%" },
-  barValue: { fontSize: 10, fontWeight: "800", color: colors.graphite900, marginBottom: 4, fontVariant: ["tabular-nums"] },
-  barTrack: { flex: 1, width: "72%", backgroundColor: colors.steel100, borderRadius: 6, justifyContent: "flex-end", overflow: "hidden" },
-  barFill: { width: "100%", minHeight: 4 },
-  barGradient: { flex: 1, borderRadius: 6 },
-  barLabel: { fontSize: 10, fontWeight: "700", color: colors.graphite700, marginTop: 5 },
-  barSub: { fontSize: 9, color: colors.graphite500, fontVariant: ["tabular-nums"] },
+  bars: { gap: 9 },
+  barRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  barDate: { width: 92, fontSize: 12, fontWeight: "700", color: colors.graphite900 },
+  barTrackH: { flex: 1, height: 14, backgroundColor: colors.steel100, borderRadius: 7, overflow: "hidden" },
+  barFillH: { height: "100%", minWidth: 6 },
+  barGradientH: { flex: 1, borderRadius: 7 },
+  barAmount: { minWidth: 78, textAlign: "right", fontSize: 12.5, fontWeight: "800", fontVariant: ["tabular-nums"] },
   emptyText: { fontSize: 12, color: colors.graphite300, textAlign: "center", paddingVertical: spacing.md },
   calRow: { flexDirection: "row" },
   calHead: { flex: 1, textAlign: "center", fontSize: 10, fontWeight: "700", color: colors.graphite300, paddingVertical: 4 },

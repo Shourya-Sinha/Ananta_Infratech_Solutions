@@ -127,27 +127,11 @@ export function WorkerSalaryScreen() {
               </View>
               <EarningsBars
                 data={days.map((d) => ({
-                  label: new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "narrow", timeZone: "UTC" }),
-                  sub: String(Number(d.date.slice(8, 10))),
+                  label: new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }),
                   value: d.netPaise / 100
                 }))}
               />
-              {/* Readable amount list — the chart alone is too crowded on
-                  small phones, so every day's exact net is also printed here. */}
-              <View style={styles.dailyList}>
-                {days.map((d) => {
-                  const net = d.netPaise / 100;
-                  return (
-                    <View key={d.date} style={styles.dailyRow}>
-                      <Text style={styles.dailyDate}>
-                        {new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}
-                      </Text>
-                      <View style={[styles.dailyDot, { backgroundColor: net < 0 ? colors.rust : colors.teal }]} />
-                      <Text style={[styles.dailyNet, { color: net < 0 ? colors.rust : colors.teal }]}>{formatINR(net, { sign: true })}</Text>
-                    </View>
-                  );
-                })}
-              </View>
+              <Text style={styles.chartHint}>Green bar = that day's net pay, longest bar is your best day. Exact amount is printed at the right of every row.</Text>
             </>
           );
         })()}
@@ -332,11 +316,7 @@ const styles = StyleSheet.create({
   chartTotal: { fontSize: 19, fontWeight: "800", color: colors.graphite900, marginTop: 2, fontVariant: ["tabular-nums"] },
   chartChip: { backgroundColor: colors.teal50, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
   chartChipText: { fontSize: 11, fontWeight: "800", color: colors.teal },
-  dailyList: { marginTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.steel100 },
-  dailyRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: colors.steel100 },
-  dailyDate: { flex: 1, fontSize: 12.5, fontWeight: "600", color: colors.graphite900 },
-  dailyDot: { width: 7, height: 7, borderRadius: 4 },
-  dailyNet: { fontSize: 13, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  chartHint: { fontSize: 11, color: colors.graphite500, marginTop: spacing.sm, lineHeight: 15 },
   breakRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
   breakIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   breakLabel: { fontSize: 14, color: colors.graphite700 },
