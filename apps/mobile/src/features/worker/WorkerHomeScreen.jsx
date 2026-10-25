@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { View, Text, ScrollView, StyleSheet, RefreshControl } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from "react-native-reanimated";
+import { useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
@@ -34,8 +35,10 @@ export function WorkerHomeScreen() {
 
   const last7 = (pay?.daily ?? []).slice(0, 7).reverse().map((d) => ({
     label: new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "narrow", timeZone: "UTC" }),
+    sub: String(Number(d.date.slice(8, 10))),
     value: d.netPaise / 100
   }));
+  const last7Total = last7.reduce((s, d) => s + d.value, 0);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -97,7 +100,7 @@ export function WorkerHomeScreen() {
           <GradientHero>
             <View style={styles.heroTop}>
               <Text style={styles.heroKicker}>Net pay · {monthLabel(month)}</Text>
-              <View style={styles.liveDot}><View style={styles.liveDotInner} /><Text style={styles.liveText}>LIVE</Text></View>
+              <View style={styles.liveDot}><PulseDot /><Text style={styles.liveText}>LIVE</Text></View>
             </View>
             <CountUp value={pay?.net ?? 0} style={styles.heroAmount} />
             <Text style={styles.heroFormula}>Earned {formatINR(pay?.earnings ?? 0)} − advances {formatINR(pay?.advances ?? 0)} − kharchi {formatINR(pay?.kharchi ?? 0)}</Text>
@@ -123,8 +126,17 @@ export function WorkerHomeScreen() {
       {/* Last 7 days earnings */}
       <SectionTitle actionLabel="Statement →" onAction={() => navigation.navigate("Salary")}>Last days · earnings</SectionTitle>
       <Card delay={160}>
+        <View style={styles.chartHead}>
+          <View>
+            <Text style={styles.chartTotalLabel}>Last {last7.length || 7} days total</Text>
+            <Text style={styles.chartTotal}>{formatINR(last7Total)}</Text>
+          </View>
+          <View style={styles.chartChip}>
+            <Text style={styles.chartChipText}>{formatINR((preview?.rates.hourlyRatePaise ?? 0) / 100)}/hr</Text>
+          </View>
+        </View>
         <EarningsBars data={last7} />
-        <Text style={styles.chartHint}>Net per day after that day's deductions · salary rate {formatINR((preview?.rates.hourlyRatePaise ?? 0) / 100)}/hr · {formatINR((preview?.rates.monthlySalaryPaise ?? 0) / 100)}/month approx</Text>
+        <Text style={styles.chartHint}>Amount above each bar is that day's net pay, after the day's deductions · approx {formatINR((preview?.rates.monthlySalaryPaise ?? 0) / 100)}/month at this rate</Text>
       </Card>
 
       {/* Announcement */}
@@ -162,6 +174,14 @@ export function WorkerHomeScreen() {
   );
 }
 
+/** Pulsing dot for the LIVE salary pill. */
+export function PulseDot() {
+  const s = useSharedValue(1);
+  useEffect(() => { s.value = withRepeat(withTiming(0.35, { duration: 750 }), -1, true); }, [s]);
+  const style = useAnimatedStyle(() => ({ opacity: s.value, transform: [{ scale: 0.8 + s.value * 0.35 }] }));
+  return <Animated.View style={[styles.liveDotInner, style]} />;
+}
+
 function HeroStat({ label, value }) {
   return (
     <View style={{ flex: 1 }}>
@@ -194,10 +214,15 @@ const styles = StyleSheet.create({
   heroStatValue: { fontSize: 14, fontWeight: "800", color: colors.white },
   heroStatLabel: { fontSize: 10, color: "rgba(255,255,255,0.55)", marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 },
   tileRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
-  chartHint: { fontSize: 11, color: colors.graphite300, marginTop: 8 },
+  chartHint: { fontSize: 11, color: colors.graphite500, marginTop: 8, lineHeight: 15 },
+  chartHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: spacing.sm },
+  chartTotalLabel: { fontSize: 10, fontWeight: "700", color: colors.graphite500, textTransform: "uppercase", letterSpacing: 0.5 },
+  chartTotal: { fontSize: 19, fontWeight: "800", color: colors.graphite900, marginTop: 2, fontVariant: ["tabular-nums"] },
+  chartChip: { backgroundColor: colors.teal50, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
+  chartChipText: { fontSize: 11, fontWeight: "800", color: colors.teal },
   noticePinned: { borderWidth: 1.5, borderColor: colors.amber },
   noticeTitle: { flex: 1, fontSize: 14, fontWeight: "800", color: colors.graphite900 },
   noticeBody: { fontSize: 12, color: colors.graphite500, marginTop: 6, lineHeight: 17 },
-  actions: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4 },
+  actions: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4, rowGap: spacing.md },
   footnote: { fontSize: 11, color: colors.graphite300, textAlign: "center", marginTop: spacing.lg, lineHeight: 16 }
 });
