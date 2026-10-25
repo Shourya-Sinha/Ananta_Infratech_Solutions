@@ -6,6 +6,7 @@ exports.calculateNetSalary = calculateNetSalary;
 exports.deriveSalaryRates = deriveSalaryRates;
 exports.expectedMonthlyGrossPaise = expectedMonthlyGrossPaise;
 exports.projectMonthlySalary = projectMonthlySalary;
+exports.getSalaryPeriodSchedule = getSalaryPeriodSchedule;
 Object.defineProperty(exports, "multiplyPaiseByFactor", {
   enumerable: true,
   get: function () {
@@ -106,6 +107,54 @@ function deriveSalaryRates(rate = {}, rules = {}) {
 }
 
 /**
+ * Payable-period schedule for one salary month.
+ *
+ * A worker created/joined mid-month is not estimated for the whole month:
+ * if they join on 24 Oct, their current-month period is 24 Oct..31 Oct
+ * (8 calendar days), not 26 days and not 1..31 Oct. Days before today are
+ * elapsed whether they were marked or not; a marked day is elapsed even if
+ * it is today/a future correction. Unmarked days from today to month-end
+ * are still earnable, so they remain in remainingDays.
+ */
+function getSalaryPeriodSchedule(input = {}) {
+  const month = String(input.month || "");
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) return { month, from: null, to: null, totalDays: 0, elapsedDays: 0, remainingDays: 0 };
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const monthStart = new Date(Date.UTC(year, monthIndex, 1));
+  const monthEnd = new Date(Date.UTC(year, monthIndex + 1, 0));
+  const toKey = (d) => d.toISOString().slice(0, 10);
+  let from = monthStart;
+  if (input.workerStartDate) {
+    const start = new Date(input.workerStartDate);
+    if (!Number.isNaN(start.getTime())) {
+      const startKey = toKey(start);
+      if (startKey > toKey(monthStart)) from = new Date(`${startKey}T00:00:00.000Z`);
+    }
+  }
+  const marked = new Set((input.markedDates || []).map((d) => String(d).slice(0, 10)));
+  const today = String(input.today || toKey(new Date())).slice(0, 10);
+  const dates = [];
+  if (from <= monthEnd) {
+    for (let d = new Date(from); d <= monthEnd; d.setUTCDate(d.getUTCDate() + 1)) dates.push(toKey(d));
+  }
+  let elapsedDays;
+  if (month < today.slice(0, 7)) elapsedDays = dates.length;
+  else if (month > today.slice(0, 7)) elapsedDays = dates.filter((d) => marked.has(d)).length;
+  else elapsedDays = dates.filter((d) => d < today || marked.has(d)).length;
+  return {
+    month,
+    from: dates[0] ?? null,
+    to: dates[dates.length - 1] ?? null,
+    totalDays: dates.length,
+    elapsedDays,
+    remainingDays: Math.max(0, dates.length - elapsedDays),
+    today
+  };
+}
+
+/**
  * Live current-month salary projection for the Worker page salary box.
  *
  * At registration (no attendance yet) this equals the full-month estimate:
@@ -121,10 +170,16 @@ function deriveSalaryRates(rate = {}, rules = {}) {
  */
 function projectMonthlySalary(input = {}) {
   const workingDaysPerMonth = Number(input.workingDaysPerMonth) > 0 ? Number(input.workingDaysPerMonth) : 26;
+  // For a worker's CURRENT salary month, the caller can supply the actual
+  // number of calendar days in that worker's payable period (for example
+  // joined on 24 Oct -> 24..31 Oct = 8 days). That period count overrides
+  // the generic 26-working-day month for this box; 26 remains the standard
+  // full-month conversion used for monthly-rate derivation.
+  const scheduledDays = Number(input.scheduledDays) > 0 ? Number(input.scheduledDays) : workingDaysPerMonth;
   const dailyRatePaise = Math.max(0, Number(input.dailyRatePaise) || 0);
   const totalEarningsPaise = Math.max(0, Number(input.totalEarningsPaise) || 0);
-  const elapsedDays = Math.max(0, Number(input.elapsedDays) || 0);
-  const remainingDays = Math.max(0, workingDaysPerMonth - elapsedDays);
+  const elapsedDays = Math.min(scheduledDays, Math.max(0, Number(input.elapsedDays) || 0));
+  const remainingDays = Math.max(0, scheduledDays - elapsedDays);
   const expectedRemainingEarningsPaise = Math.round(dailyRatePaise * remainingDays);
   const projectedGrossPaise = (0, _money.addPaise)(totalEarningsPaise, expectedRemainingEarningsPaise);
   const paidDeductionsPaise = (0, _money.addPaise)(input.advanceDeductionsPaise || 0, input.kharchiDeductionsPaise || 0, input.otherDeductionsPaise || 0);
@@ -132,6 +187,7 @@ function projectMonthlySalary(input = {}) {
   const projectedNetPaise = Math.max(0, projectedGrossPaise - paidDeductionsPaise);
   return {
     workingDaysPerMonth,
+    scheduledDays,
     elapsedDays,
     remainingDays,
     expectedRemainingEarningsPaise,

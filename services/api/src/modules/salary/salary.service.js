@@ -290,17 +290,40 @@ exports.SalaryService = {
       fallbackDailyRatePaise: profile.workType?.defaultDailyRatePaise
     }, rules);
     const statement = await this.getStatement(workerId, month);
-    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).format(new Date());
     const today = statement.daily.find((d) => d.date === todayKey);
-    // A marked day is an elapsed day even when ABSENT, unpaid leave,
-    // half-day or reduced hours. Using only "worked" days would keep
-    // assuming that missed/short days can still be earned later, so the
-    // salary box would never decrease when attendance is recorded.
-    const elapsedDays = statement.attendance.markedDays ?? statement.attendance.presentDays + statement.attendance.paidLeaveDays + statement.attendance.halfDays + statement.attendance.absentDays + statement.attendance.unpaidLeaveDays + (statement.attendance.customDays ?? 0);
-    const expectedGrossPaise = (0, _utils.expectedMonthlyGrossPaise)(rates);
+    // Current-month salary is for the worker's payable period in that
+    // month, not always a generic 26-day month. Example: a worker created
+    // on 24 Oct has an Oct period of 24..31 Oct = 8 days. Attendance dates
+    // make today/future marked days elapsed; unmarked past period days are
+    // elapsed too. Unmarked days from today to month-end can still be earned.
+    const {
+      from: periodFrom,
+      to: periodTo
+    } = (0, _statement.monthBounds)(month);
+    const attendanceRows = await _Attendance.Attendance.find({
+      worker: workerId,
+      date: {
+        $gte: periodFrom,
+        $lte: periodTo
+      }
+    }).select("date status");
+    const salaryPeriod = (0, _utils.getSalaryPeriodSchedule)({
+      month,
+      workerStartDate: profile.createdAt,
+      today: todayKey,
+      markedDates: attendanceRows.map((row) => row.date.toISOString().slice(0, 10))
+    });
+    const elapsedDays = salaryPeriod.elapsedDays;
     const projection = (0, _utils.projectMonthlySalary)({
       dailyRatePaise: rates.dailyRatePaise,
       workingDaysPerMonth: rates.workingDaysPerMonth,
+      scheduledDays: salaryPeriod.totalDays,
       totalEarningsPaise: statement.totals.totalEarningsPaise,
       elapsedDays,
       advanceDeductionsPaise: statement.totals.advanceDeductionsPaise,
@@ -312,7 +335,10 @@ exports.SalaryService = {
     const projectedGrossPaise = projection.projectedGrossPaise;
     // For a MONTHLY-salaried worker the full-month expectation is the fixed
     // monthly salary itself; for hourly/daily it is rate × working days.
-    const approximateMonthlyGrossPaise = profile.salaryMode === "MONTHLY" && profile.monthlySalaryPaise > 0 ? profile.monthlySalaryPaise : expectedGrossPaise;
+    // The Worker-page "current month" amount follows the payable period
+    // above (e.g. joined 24 Oct -> ₹750 x 8 days). rates.monthlySalaryPaise
+    // still reports the standard full-month conversion (x26).
+    const approximateMonthlyGrossPaise = profile.salaryMode === "MONTHLY" && profile.monthlySalaryPaise > 0 ? profile.monthlySalaryPaise : Math.round(rates.dailyRatePaise * salaryPeriod.totalDays);
     return {
       workerId: workerId.toString(),
       month,
@@ -333,6 +359,8 @@ exports.SalaryService = {
       },
       monthSoFar: statement.totals,
       attendance: statement.attendance,
+      workerStartDate: profile.createdAt,
+      salaryPeriod,
       approximateMonthlyGrossPaise,
       projectedGrossPaise,
       approximateMonthlyNetPaise: Math.max(0, (profile.salaryMode === "MONTHLY" ? approximateMonthlyGrossPaise : projectedGrossPaise) - statement.totals.advanceDeductionsPaise - statement.totals.kharchiDeductionsPaise - statement.totals.otherDeductionsPaise),

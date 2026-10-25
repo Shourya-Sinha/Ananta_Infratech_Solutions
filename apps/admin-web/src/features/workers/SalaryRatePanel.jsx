@@ -32,6 +32,10 @@ export function SalaryRatePanel({ workerId, isSuperAdmin }) {
   const monthSoFar = preview?.monthSoFar ?? {};
   const totalDeductions = (monthSoFar.advanceDeductionsPaise ?? 0) + (monthSoFar.kharchiDeductionsPaise ?? 0) + (monthSoFar.otherDeductionsPaise ?? 0);
   const elapsedDays = projection?.elapsedDays ?? attendance.markedDays ?? 0;
+  const salaryPeriod = preview?.salaryPeriod;
+  const periodDays = salaryPeriod?.totalDays ?? projection?.scheduledDays ?? workingDays;
+  const remainingDays = salaryPeriod?.remainingDays ?? projection?.remainingDays ?? workingDays;
+  const formatShortDate = (iso) => (iso ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(new Date(`${iso}T00:00:00`)) : "");
 
   // Prefill the editor with the worker's current effective per-day wage.
   useEffect(() => {
@@ -69,11 +73,13 @@ export function SalaryRatePanel({ workerId, isSuperAdmin }) {
               <p className="text-[11px] uppercase tracking-wide text-paper/60">Total salary — current month (live estimate)</p>
               <p className="font-display text-3xl font-semibold tabular-nums">{inr(preview.approximateMonthlyNetPaise)}</p>
               <p className="mt-1 text-xs text-paper/60">
-                Starts at {inr(rates.dailyRatePaise)}/day × {workingDays} working days = {inr(preview.approximateMonthlyGrossPaise)} when the worker is newly created and fully present.
+                {salaryPeriod?.from
+                  ? <>For this month: {inr(rates.dailyRatePaise)}/day × {periodDays} day{periodDays === 1 ? "" : "s"} ({formatShortDate(salaryPeriod.from)}–{formatShortDate(salaryPeriod.to)}) = {inr(preview.approximateMonthlyGrossPaise)} before deductions{preview.workerStartDate && salaryPeriod.from > `${preview.month}-01` ? <> — counted from the worker&apos;s joining/creation date, not from the 1st</> : ""}. {remainingDays} day{remainingDays === 1 ? "" : "s"} still earnable.</>
+                  : <>Starts at {inr(rates.dailyRatePaise)}/day × {periodDays} days = {inr(preview.approximateMonthlyGrossPaise)} when the worker is newly created and fully present.</>}
               </p>
             </div>
             <div className="text-right text-xs text-paper/70">
-              <p>{elapsedDays} day{elapsedDays === 1 ? "" : "s"} recorded · {projection?.remainingDays ?? workingDays} expected remaining</p>
+              <p>{elapsedDays} day{elapsedDays === 1 ? "" : "s"} elapsed · {remainingDays} expected remaining</p>
               <p>{attendance.presentDays ?? 0} present · {attendance.halfDays ?? 0} half · {attendance.absentDays ?? 0} absent</p>
             </div>
           </div>
@@ -101,7 +107,7 @@ export function SalaryRatePanel({ workerId, isSuperAdmin }) {
             <dd className="font-mono font-medium text-graphite-900">{inr(rates.hourlyRatePaise)}/hr</dd>
           </div>
           <div>
-            <dt className="text-graphite-500">Approx. monthly</dt>
+            <dt className="text-graphite-500">Full-month standard ({workingDays} days)</dt>
             <dd className="font-mono font-medium text-graphite-900">{inr(preview.approximateMonthlyGrossPaise)}</dd>
           </div>
           <div>
@@ -119,7 +125,7 @@ export function SalaryRatePanel({ workerId, isSuperAdmin }) {
             <dd className="font-mono font-medium text-graphite-900">{inr(preview.approximateMonthlyNetPaise)}</dd>
           </div>
           <div>
-            <dt className="text-graphite-500">Projected gross</dt>
+            <dt className="text-graphite-500">Current-month projected gross</dt>
             <dd className="font-mono font-medium text-graphite-900">{inr(preview.projectedGrossPaise)}</dd>
           </div>
           <div>
