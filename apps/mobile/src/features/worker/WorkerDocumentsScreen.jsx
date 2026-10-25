@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { View, Text, ScrollView, StyleSheet, Pressable, Alert, ActionSheetIOS, Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { ScreenHeader, Card, Badge } from "@/components/ui";
+import { DocumentPreview } from "@/components/DocumentPreview";
+import { BrandFooter } from "@/components/BrandFooter";
+import { Ionicons } from "@expo/vector-icons";
 import { useMyDocuments, useUploadDocument } from "./documentsApi";
 import { colors, spacing } from "@/theme";
 
@@ -30,6 +34,7 @@ async function pickImage(source) {
 }
 
 export function WorkerDocumentsScreen() {
+  const [previewDoc, setPreviewDoc] = useState(null);
   const { data: documents, isLoading } = useMyDocuments();
   const upload = useUploadDocument();
 
@@ -108,20 +113,34 @@ export function WorkerDocumentsScreen() {
                     <Badge label="Not uploaded" tone="neutral" />
                   )}
                 </View>
-                <Pressable
-                  style={({ pressed }) => [styles.uploadButton, pressed && { opacity: 0.85 }]}
-                  onPress={() => handleUpload(type)}
-                  disabled={upload.isPending}
-                >
-                  <Text style={styles.uploadButtonText}>
-                    {doc ? (doc.verificationStatus === "REJECTED" ? "Re-upload" : "Replace") : "Upload"}
-                  </Text>
-                </Pressable>
+                <View style={styles.actionsRow}>
+                  {doc?.url && (
+                    <Pressable
+                      style={({ pressed }) => [styles.previewButton, pressed && { opacity: 0.85 }]}
+                      onPress={() => setPreviewDoc(doc)}
+                      accessibilityLabel={`Preview ${label}`}
+                    >
+                      <Ionicons name="eye-outline" size={15} color="#fff" />
+                      <Text style={styles.previewButtonText}>Preview</Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    style={({ pressed }) => [styles.uploadButton, styles.flexBtn, pressed && { opacity: 0.85 }]}
+                    onPress={() => handleUpload(type)}
+                    disabled={upload.isPending}
+                  >
+                    <Text style={styles.uploadButtonText}>
+                      {doc ? (doc.verificationStatus === "REJECTED" ? "Re-upload" : "Replace") : "Upload"}
+                    </Text>
+                  </Pressable>
+                </View>
               </Card>
             </Animated.View>
           );
         })
       )}
+      <DocumentPreview doc={previewDoc} onClose={() => setPreviewDoc(null)} />
+      <BrandFooter />
     </ScrollView>
   );
 }
@@ -141,4 +160,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   uploadButtonText: { fontSize: 13, fontWeight: "600", color: colors.graphite900 },
+  actionsRow: { flexDirection: "row", gap: spacing.sm },
+  flexBtn: { flex: 1 },
+  previewButton: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: colors.navy, borderRadius: 5, paddingVertical: 8,
+  },
+  previewButtonText: { fontSize: 13, fontWeight: "700", color: "#fff" },
 });

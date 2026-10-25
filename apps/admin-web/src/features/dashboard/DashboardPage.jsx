@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { BrandFooter } from "@/components/ui/BrandFooter";
 import { api, unwrap } from "@/lib/apiClient";
 import { KpiCard } from "@/components/ui/DataDisplay";
 import { formatINR } from "@/lib/format";
@@ -117,11 +118,50 @@ export function DashboardPage() {
   const dashboardTotalExpenses = grossTotals?.totalExpenses ?? pnl?.totalExpenses;
   const dashboardGrossProfitLoss = grossTotals?.grossProfitLoss ?? (pnl ? pnl.totalProfit - pnl.totalLoss : undefined);
 
+  const todayLabel = new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
+  const chartColors = ["#1F7A72", "#B84A3E", "#8D97A3", "#C97A1F", "#E8A33D"];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-xl font-semibold text-graphite-900">Dashboard</h1>
-        <p className="text-sm text-graphite-500">Company-wide overview, live. Covers sites, workforce, finance, procurement & operations.</p>
+      {/* Modern hero header */}
+      <div
+        className="relative overflow-hidden rounded-3xl px-6 py-6 text-white shadow-xl sm:px-8"
+        style={{ background: "linear-gradient(120deg,#0B1220 0%,#16283F 55%,#14524B 130%)" }}
+      >
+        <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-amber/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-teal/25 blur-3xl" />
+        <div className="relative flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-white/60">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal opacity-70" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-teal" />
+              </span>
+              Live overview · {todayLabel}
+            </p>
+            <h1 className="mt-2 font-display text-2xl font-bold sm:text-3xl">Ananta Infratech Dashboard</h1>
+            <p className="mt-1 max-w-xl text-sm text-white/65">
+              Sites, workforce, finance, procurement &amp; operations — updating in real time as managers and workers act.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => navigate("/workers")} className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white ring-1 ring-white/25 backdrop-blur transition hover:bg-white/20">
+              Workers
+            </button>
+            <button onClick={() => navigate("/finance")} className="rounded-full bg-amber px-4 py-2 text-xs font-semibold text-graphite-900 shadow transition hover:brightness-110">
+              Finance
+            </button>
+            <button onClick={() => navigate("/payroll")} className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white ring-1 ring-white/25 backdrop-blur transition hover:bg-white/20">
+              Payroll
+            </button>
+          </div>
+        </div>
+        <div className="relative mt-5 flex flex-wrap gap-2 text-[11px] font-semibold">
+          <span className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">{activeWorkers?.total ?? "—"} active workers</span>
+          <span className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">{activeSites?.length ?? "—"} active sites</span>
+          <span className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">{managers?.total ?? "—"} managers</span>
+          <span className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">{(pendingAdvances?.length ?? 0) + (pendingKharchi?.length ?? 0)} requests waiting</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -194,10 +234,16 @@ export function DashboardPage() {
             <XAxis dataKey="name" tick={{ fontSize: 12, fontFamily: "Inter" }} stroke="#8D97A3" />
             <YAxis tick={{ fontSize: 12, fontFamily: "JetBrains Mono" }} stroke="#8D97A3" />
             <Tooltip formatter={(v) => formatINR(v)} />
-            <Bar dataKey="value" fill="#C97A1F" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+              {chartData.map((entry, i) => (
+                <Cell key={entry.name} fill={chartColors[i % chartColors.length]} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      <BrandFooter />
     </div>
   );
 }

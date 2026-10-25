@@ -8,6 +8,7 @@ import { Card, EmptyState, Button } from "@/components/ui";
 import { EarningsBars, SectionTitle } from "@/components/design";
 import { CountUp, PressScale, ProgressBar, formatINR } from "@/components/interactive";
 import { useMyStatement, useMyReceipts } from "./api";
+import { BrandFooter } from "@/components/BrandFooter";
 import { currentMonthKey, monthLabel, toRupeeView } from "@/lib/salaryDisplay";
 import { colors, spacing, radius, shadow } from "@/theme";
 
@@ -20,9 +21,16 @@ const TYPE_LABEL = {
   REVERSAL: "Reversal"
 };
 
+function shiftMonthKey(month, delta) {
+  const [y, m] = month.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export function WorkerSalaryScreen() {
   const qc = useQueryClient();
-  const month = currentMonthKey();
+  const [month, setMonth] = useState(currentMonthKey());
+  const isCurrentMonth = month === currentMonthKey();
   const { data: statement, isLoading, refetch } = useMyStatement(month);
   const { data: receipts } = useMyReceipts();
   const pay = toRupeeView(statement);
@@ -44,11 +52,33 @@ export function WorkerSalaryScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.amber} />}
     >
+      <View style={styles.monthBar}>
+        <PressScale onPress={() => setMonth((m) => shiftMonthKey(m, -1))} style={styles.monthBtn} accessibilityLabel="Previous month">
+          <Ionicons name="chevron-back" size={18} color={colors.graphite700} />
+        </PressScale>
+        <Text style={styles.monthLabel}>{monthLabel(month)}</Text>
+        <PressScale
+          onPress={() => !isCurrentMonth && setMonth((m) => shiftMonthKey(m, 1))}
+          style={[styles.monthBtn, isCurrentMonth && { opacity: 0.3 }]}
+          accessibilityLabel="Next month"
+        >
+          <Ionicons name="chevron-forward" size={18} color={colors.graphite700} />
+        </PressScale>
+      </View>
+
       <Animated.View entering={FadeInDown.duration(300)}>
         <LinearGradient colors={["#1B2027", colors.graphite900]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <Text style={styles.kicker}>Take-home · {monthLabel(month)}</Text>
           <CountUp value={pay?.net ?? 0} style={styles.heroAmount} />
           <Text style={styles.heroNote}>Total earnings minus advances and kharchi. Updates as soon as one is taken.</Text>
+          {!!pay && (
+            <View style={styles.payoutChip}>
+              <Ionicons name={pay.payrollStatus === "PAID" ? "checkmark-circle" : "time-outline"} size={13} color={colors.gold} />
+              <Text style={styles.payoutChipText}>
+                Payout: {pay.payrollStatus === "PAID" ? "Paid" : pay.payrollStatus === "FINALIZED" ? "Finalized — payment pending" : "Live estimate"}
+              </Text>
+            </View>
+          )}
           <View style={{ marginTop: spacing.lg }}>
             <ProgressBar percent={pay?.netPercent ?? 0} color={colors.tealBright} />
             <View style={styles.heroStats}>
@@ -106,6 +136,47 @@ export function WorkerSalaryScreen() {
         <BreakdownRow icon="wallet-outline" color={colors.graphite900} label="Net salary" value={pay?.net ?? 0} bold />
       </Card>
 
+      {pay?.salaryRates && (
+        <>
+          <Text style={styles.sectionLabel}>How your pay is calculated</Text>
+          <Card delay={140} style={{ marginBottom: 0 }}>
+            <BreakdownRow icon="cash-outline" color={colors.graphite900} label="Your per-day wage" value={pay.salaryRates.dailyRatePaise / 100} />
+            <BreakdownRow icon="time-outline" color={colors.graphite700} label={`Per hour (÷ ${pay.salaryRates.fullDayHours}h full day)`} value={pay.salaryRates.hourlyRatePaise / 100} />
+            {!!pay.attendance && (
+              <Text style={styles.calcNote}>
+                This month: {pay.attendance.presentDays} present · {pay.attendance.halfDays} half · {pay.attendance.absentDays} absent · {pay.attendance.paidLeaveDays} paid leave
+                {pay.attendance.totalHoursWorked ? ` · ${pay.attendance.totalHoursWorked}h worked in total` : ""}. A short day pays only its hours — e.g. 6h = 6 × per-hour rate.
+              </Text>
+            )}
+          </Card>
+        </>
+      )}
+
+      {pay && pay.dailyAttendance.length > 0 && (
+        <>
+          <Text style={styles.sectionLabel}>Attendance &amp; day pay</Text>
+          {pay.dailyAttendance.map((d, i) => (
+            <Animated.View key={d.date} entering={FadeInDown.delay(Math.min(i, 8) * 40).duration(240)} style={styles.dayCard}>
+              <View style={styles.dayHead}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dayDate}>
+                    {new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}
+                  </Text>
+                  <Text style={styles.dayMeta}>{d.calculation}</Text>
+                </View>
+                <View style={[styles.attBadge, { backgroundColor: d.totalEarningPaise > 0 ? colors.teal50 : colors.rust50 }]}>
+                  <Text style={[styles.attBadgeText, { color: d.totalEarningPaise > 0 ? colors.teal : colors.rust }]}>{d.label}</Text>
+                </View>
+                <Text style={[styles.dayNet, { color: d.totalEarningPaise > 0 ? colors.teal : colors.rust, marginLeft: spacing.sm }]}>
+                  {formatINR(d.totalEarningPaise / 100)}
+                </Text>
+              </View>
+            </Animated.View>
+          ))}
+          <Text style={styles.calcNote}>Day pay is before any advance/kharchi deducted that day — deductions are in the ledger below.</Text>
+        </>
+      )}
+
       {receipts && receipts.length > 0 && (
         <>
           <Text style={styles.sectionLabel}>Salary payment receipts</Text>
@@ -161,6 +232,7 @@ export function WorkerSalaryScreen() {
           );
         })
       )}
+      <BrandFooter />
     </ScrollView>
   );
 }
@@ -197,6 +269,14 @@ function BreakdownRow({ icon, color, label, value, percent, bold }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
+  monthBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.md },
+  monthBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.steel200, alignItems: "center", justifyContent: "center" },
+  monthLabel: { fontSize: 16, fontWeight: "800", color: colors.graphite900 },
+  payoutChip: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginTop: spacing.sm, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  payoutChipText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  calcNote: { fontSize: 12, color: colors.graphite500, lineHeight: 17, marginTop: spacing.sm },
+  attBadge: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  attBadgeText: { fontSize: 11, fontWeight: "800" },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   hero: { borderRadius: radius.xl, padding: spacing.xl, ...shadow.lifted },
   kicker: { fontSize: 12, color: "rgba(255,255,255,0.7)", fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },

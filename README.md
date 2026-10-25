@@ -525,3 +525,11 @@ The Payroll **Attendance** column no longer shows a bare cryptic `1P` (a status 
 ## Every paise exact — no nearest-rupee rounding (latest)
 
 Display rounding previously hid paise: the Payroll rate header showed **₹94/hr** (₹93.75 rounded up) and a 6h day showed **₹563** instead of **₹562.50**. Money was always stored as exact integer paise, but the Admin/mobile formatters rounded displays to whole rupees, and one approve-advance path rounded the actual approval amount. Now: the central `formatINR` formatters (Admin Web + mobile) always render exactly 2 decimals, every display-side `Math.round(.../100)` was removed (payroll totals, day pay, finance, requests, salary panel, worker detail, budgets, materials), advance approvals send the exact rupee amount (₹562.50, not ₹563), and the backend continues to store/pay integer paise (`netSalaryPaise` is paid as-is). Covered by `exactPaiseMoney.test.js`.
+
+## Mobile parity, branding & modern dashboard (latest)
+
+- **Mobile document preview**: workers can now **Preview their own uploaded documents** in the mobile app — full-screen over the whole phone (image centered; PDFs open in the device viewer), with the same big **red ✕ close button** as the admin preview; closing returns to the list with verification status/rejection reason.
+- **Mobile salary clarity**: the Salary screen now has a **month switcher** (‹ October 2026 ›) so any day/month can be reviewed, a **Payout status** chip (Live estimate / Finalized / Paid), a **How your pay is calculated** card (per-day wage, per-hour rate, attendance counts, total hours), and an **Attendance & day pay** list showing every day (AB, 6h, 8h Full day, OT) with its exact calculation and day pay in paise-exact format.
+- **Manager workers** are now modern cards with avatar, site, per-day wage chip (agreed vs standard) and tap-through to Set Salary Rate.
+- **Branding**: "Developed & maintained by **Shourya** · Ananta Infratech Solutions" appears on mobile Login, Salary, Documents, Manager Workers and the Settings/Profile **About** section, and in the Admin Web **Dashboard footer** (dashboard-only, per preference).
+- **Admin Dashboard** got a modern look: navy gradient hero with live pulse, date, quick actions (Workers/Finance/Payroll), live stat pills, and a multi-colour income-vs-cost chart.

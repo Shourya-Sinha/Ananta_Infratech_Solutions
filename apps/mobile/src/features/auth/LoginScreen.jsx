@@ -5,6 +5,7 @@ import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
 import { Button } from "@/components/ui";
 import { useLogin } from "./api";
 import { colors, spacing, radius, shadow, gradients, motion } from "@/theme";
+import { BrandFooter } from "@/components/BrandFooter";
 
 export function LoginScreen({ navigation }) {
   const [phone, setPhone] = useState("");
@@ -71,6 +72,7 @@ export function LoginScreen({ navigation }) {
 
           <Animated.View entering={FadeIn.delay(300).duration(motion.slow)}>
             <Text style={styles.footerNote}>Attendance is marked by your Manager/Admin.{"\n"}Your salary, advances & kharchi update live.</Text>
+            <BrandFooter />
             <Pressable style={styles.registerRow} onPress={() => navigation.navigate("Register")}>
               <Text style={styles.registerText}>
                 New worker? <Text style={styles.registerLink}>Register</Text>

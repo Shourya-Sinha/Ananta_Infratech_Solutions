@@ -42,6 +42,10 @@ export function toRupeeView(statement) {
     netPercent: share(Math.max(0, t.netSalaryPaise)),
     advancePercent: share(t.advanceDeductionsPaise),
     kharchiPercent: share(t.kharchiDeductionsPaise),
-    daily: statement.daily
+    daily: statement.daily,
+    dailyAttendance: statement.dailyAttendance ?? [],
+    salaryRates: statement.salaryRates ?? null,
+    attendance: statement.attendance ?? null,
+    payrollStatus: statement.payrollStatus ?? "LIVE"
   };
 }
