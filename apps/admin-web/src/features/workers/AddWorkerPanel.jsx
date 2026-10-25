@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { TriangleAlert } from "lucide-react";
-import { useRegisterWorker, useCheckWorkerDuplicate, useSitesForSelect, useWorkTypes } from "./api";
+import { useRegisterWorker, useCheckWorkerDuplicate, useSitesForSelect, useWorkTypes, useSeedDefaultWorkTypes } from "./api";
 import { formatINR } from "@/lib/format";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/Toast";
@@ -32,6 +32,7 @@ export function AddWorkerPanel() {
   // { matches, existing, verified, canOverwrite, message } from the API.
   const [duplicate, setDuplicate] = useState(null);
   const { data: workTypes } = useWorkTypes();
+  const seedWorkTypes = useSeedDefaultWorkTypes();
   const { data: sites } = useSitesForSelect();
   const register = useRegisterWorker();
   const checkDuplicate = useCheckWorkerDuplicate();
@@ -226,6 +227,25 @@ export function AddWorkerPanel() {
       </option>
     ))}
   </select>
+  {workTypes && workTypes.length === 0 && (
+    <div className="mt-1 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-700">
+      No work types exist yet.{" "}
+      <button
+        type="button"
+        className="font-semibold underline"
+        disabled={seedWorkTypes.isPending}
+        onClick={() =>
+          seedWorkTypes.mutate(undefined, {
+            onSuccess: (r) => toast.success(`Loaded ${r.inserted} standard construction work types (Mason, Helper, Carpenter, Electrician…).`),
+            onError: (err) => toast.error(err instanceof Error ? err.message : "Could not load work types.")
+          })
+        }
+      >
+        {seedWorkTypes.isPending ? "Loading…" : "Load standard construction work types"}
+      </button>{" "}
+      (Mason, Helper, Foreman, Carpenter, Electrician…) — or add your own in Work Types.
+    </div>
+  )}
 </div>
         {/* <div>
           <label className="mb-1 block text-xs text-graphite-500">

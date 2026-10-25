@@ -14,6 +14,7 @@ const { Role } = require("../models/Role");
 const { User } = require("../models/User");
 const { ROLE_KEYS } = require("@ananta/shared-types");
 const { syncPermissions } = require("../syncPermissions");
+const { syncWorkTypes } = require("../syncWorkTypes");
 
 const ROLE_LABELS = {
   SUPER_ADMIN: "Super Admin",
@@ -63,6 +64,8 @@ async function main() {
     const { permissions, insertedRolePermissions } = await syncPermissions();
     logger.info(`Seeded ${permissions} permissions (${insertedRolePermissions} new role-permission row(s))`);
   }
+  const wt = await syncWorkTypes();
+  logger.info(`Seeded work types (${wt.inserted} new of ${wt.total} standard trades)`);
   await seedSuperAdmin(roleDocs);
   await disconnectDB();
   logger.info("Seeding complete");

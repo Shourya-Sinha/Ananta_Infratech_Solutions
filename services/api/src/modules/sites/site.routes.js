@@ -152,8 +152,15 @@ sitesRouter.post(
   }),
 );
 
+// Update: every field optional, and manager/budget/dates are nullable —
+// sending null CLEARS the value (unassign manager, remove budget/dates).
+// The plain create schema stays strict for brand-new sites.
 const updateSiteSchema = createSiteSchema.partial().extend({
   status: _zod.z.enum(_sharedTypes.SITE_STATUS).optional(),
+  manager: _zod.z.string().min(1).nullable().optional(),
+  budgetRupees: _zod.z.number().positive().nullable().optional(),
+  startDate: _zod.z.string().date().nullable().optional(),
+  expectedCompletionDate: _zod.z.string().date().nullable().optional(),
 });
 sitesRouter.patch(
   "/:id",

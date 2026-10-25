@@ -12,6 +12,17 @@ Object.keys(_permissions).forEach(function (key) {
     }
   });
 });
+var _workTypes = require("./workTypes");
+Object.keys(_workTypes).forEach(function (key) {
+  if (key === "default" || key === "__esModule") return;
+  if (key in exports && exports[key] === _workTypes[key]) return;
+  Object.defineProperty(exports, key, {
+    enumerable: true,
+    get: function () {
+      return _workTypes[key];
+    }
+  });
+});
 var _salaryRules = require("./salaryRules");
 Object.keys(_salaryRules).forEach(function (key) {
   if (key === "default" || key === "__esModule") return;

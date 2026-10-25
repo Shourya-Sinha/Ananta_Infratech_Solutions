@@ -104,7 +104,7 @@ export function CompanyPage() {
             ))}
             {(holidays ?? []).length === 0 && <p className="py-3 text-sm text-graphite-400">No holidays set.</p>}
           </div>
-          <p className="text-xs text-graphite-400">Holidays show on every worker's attendance calendar in the app.</p>
+          <p className="text-xs text-graphite-400">Holidays show on every worker&apos;s attendance calendar in the app.</p>
         </div>
       </div>
 

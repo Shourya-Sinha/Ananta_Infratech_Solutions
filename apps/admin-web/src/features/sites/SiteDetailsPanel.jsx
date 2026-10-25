@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { api, unwrap } from "@/lib/apiClient";
@@ -73,17 +74,27 @@ export function SiteDetailsPanel({ site, managers = [], onClose }) {
       description: form.description.trim(),
       status: form.status,
     };
-    if (form.manager) payload.manager = form.manager;
-    if (form.budgetRupees !== "") {
+    // Manager / budget / dates are nullable on the API: null CLEARS them
+    // (unassign the manager, remove a wrong budget or date). Text fields are
+    // sent as-is so they can be cleared too. Every field below the name is
+    // editable here: client, project type, start/completion dates, budget,
+    // manager, status and description.
+    payload.manager = form.manager || null;
+    if (form.budgetRupees === "") payload.budgetRupees = null;
+    else {
       const n = Number(form.budgetRupees);
-      if (!Number.isNaN(n) && n > 0) payload.budgetRupees = n;
+      if (Number.isNaN(n) || n <= 0) {
+        toast.error("Budget must be a positive amount, or empty to clear it.");
+        return;
+      }
+      payload.budgetRupees = n;
     }
-    if (form.startDate) payload.startDate = form.startDate;
-    if (form.expectedCompletionDate) payload.expectedCompletionDate = form.expectedCompletionDate;
-
-    // Remove empty optional strings so backend doesn't overwrite with empty if we want to keep? 
-    // But for client/projectType/description we intentionally send empty string to allow clearing.
-    // For dates/manager/budget we only send when non-empty.
+    payload.startDate = form.startDate || null;
+    payload.expectedCompletionDate = form.expectedCompletionDate || null;
+    if (payload.startDate && payload.expectedCompletionDate && payload.expectedCompletionDate < payload.startDate) {
+      toast.error("Expected completion cannot be before the start date.");
+      return;
+    }
     update.mutate(payload);
   };
 
@@ -173,9 +184,40 @@ export function SiteDetailsPanel({ site, managers = [], onClose }) {
                     {site.manager.name} <span className="font-normal text-graphite-500">({site.manager.phone ?? ""})</span>
                   </>
                 ) : (
-                  "Unassigned"
+                  <span className="inline-flex flex-wrap items-center gap-2">
+                    <span className="text-rust">Unassigned</span>
+                    {managers.length > 0 ? (
+                      <span className="inline-flex items-center gap-1">
+                        <select id="quick-manager" className="input !w-auto !py-1 text-xs" defaultValue="">
+                          <option value="">Select manager…</option>
+                          {managers.map((u) => (
+                            <option key={u._id} value={u._id}>{u.name} — {u.phone}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="btn-primary !px-2 !py-1 text-xs"
+                          disabled={update.isPending}
+                          onClick={() => {
+                            const el = document.getElementById("quick-manager");
+                            if (!el?.value) { toast.error("Select a manager first."); return; }
+                            update.mutate({ manager: el.value });
+                          }}
+                        >
+                          Assign
+                        </button>
+                      </span>
+                    ) : (
+                      <Link to="/workers?add=manager" className="text-xs font-semibold text-amber-600 hover:underline">
+                        + Register a manager first
+                      </Link>
+                    )}
+                  </span>
                 )}
               </dd>
+              {managers.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600">No manager accounts exist yet — register one via Workers → “+ Add manager”, then assign them here.</p>
+              )}
             </div>
             <div className="md:col-span-2">
               <dt className="text-xs uppercase tracking-wide text-graphite-500">Description</dt>
@@ -253,9 +295,9 @@ export function SiteDetailsPanel({ site, managers = [], onClose }) {
               <label className="mb-1 block text-xs font-medium text-graphite-700">Budget (₹)</label>
               <input
                 type="number"
-                min="1"
+                min="0"
                 className="input"
-                placeholder="e.g. 500000"
+                placeholder="e.g. 500000 — empty clears the budget"
                 value={form.budgetRupees}
                 onChange={(e) => setForm({ ...form, budgetRupees: e.target.value })}
               />
@@ -267,7 +309,10 @@ export function SiteDetailsPanel({ site, managers = [], onClose }) {
                 value={form.manager}
                 onChange={(e) => setForm({ ...form, manager: e.target.value })}
               >
-                <option value="">Unassigned</option>
+                <option value="">Unassigned (clear manager)</option>
+                {site.manager?._id && !managers.some((u) => u._id === site.manager._id) && (
+                  <option value={site.manager._id}>{site.manager.name} — {site.manager.phone} (current)</option>
+                )}
                 {managers.map((u) => (
                   <option key={u._id} value={u._id}>
                     {u.name} — {u.phone}

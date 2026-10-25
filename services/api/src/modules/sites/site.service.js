@@ -27,7 +27,18 @@ exports.SiteService = {
     if (!site) throw _AppError.AppError.notFound("Site not found");
     return site;
   },
+  async assertManagerExists(managerId) {
+    if (!managerId) return;
+    const { User } = require("../../db/models/User");
+    const user = await User.findById(managerId).populate("role", "baseRole key");
+    if (!user) throw _AppError.AppError.validation("Selected manager account does not exist.");
+    const base = user.role?.baseRole ?? user.role?.key;
+    if (base !== "MANAGER" && base !== "SUPER_ADMIN") {
+      throw _AppError.AppError.validation("Site manager must be a Manager (or Admin) account — workers cannot manage sites.");
+    }
+  },
   async create(input, actorId) {
+    await this.assertManagerExists(input.manager);
     const existing = await _Site.Site.findOne({
       code: input.code.toUpperCase()
     });
@@ -58,6 +69,7 @@ exports.SiteService = {
     return site;
   },
   async update(siteId, updates, actorId) {
+    await this.assertManagerExists(updates.manager);
     const site = await _Site.Site.findById(siteId);
     if (!site) throw _AppError.AppError.notFound("Site not found");
     const before = {
@@ -68,15 +80,18 @@ exports.SiteService = {
     if (updates.address !== undefined) site.address = updates.address;
     if (updates.client !== undefined) site.client = updates.client;
     if (updates.projectType !== undefined) site.projectType = updates.projectType;
-    if (updates.manager !== undefined) site.manager = updates.manager;
+    // null = clear the field (unassign manager, remove budget / dates);
+    // undefined = leave it untouched. Empty string also clears text fields.
+    if (updates.manager !== undefined) site.manager = updates.manager || undefined;
     if (updates.status !== undefined) site.status = updates.status;
     if (updates.description !== undefined) site.description = updates.description;
-    if (updates.budgetRupees !== undefined) site.budgetPaise = (0, _utils.rupeesToPaise)(updates.budgetRupees);
-    if (updates.startDate !== undefined) site.startDate = new Date(updates.startDate);
+    if (updates.budgetRupees !== undefined) site.budgetPaise = updates.budgetRupees == null ? undefined : (0, _utils.rupeesToPaise)(updates.budgetRupees);
+    if (updates.startDate !== undefined) site.startDate = updates.startDate ? new Date(updates.startDate) : undefined;
     if (updates.expectedCompletionDate !== undefined) {
-      site.expectedCompletionDate = new Date(updates.expectedCompletionDate);
+      site.expectedCompletionDate = updates.expectedCompletionDate ? new Date(updates.expectedCompletionDate) : undefined;
     }
     await site.save();
+    await site.populate("manager", "name phone");
     await _audit.AuditService.log({
       actor: actorId,
       action: "SITE_UPDATED",
