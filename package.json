@@ -8,7 +8,8 @@
     "packages/*"
   ],
   "overrides": {
-    "react-native": "0.74.5"
+    "react-native": "0.74.5",
+    "expo-font": "~12.0.10"
   },
   "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:admin-web\"",
