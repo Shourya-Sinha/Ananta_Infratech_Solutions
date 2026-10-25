@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Eye, ExternalLink, FileText, X } from "lucide-react";
 import { useUploadWorkerDocument, useVerifyWorkerDocument, useWorkerDocuments } from "./api";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDate } from "@/lib/format";
@@ -18,6 +19,7 @@ export function WorkerDocumentsCard({ workerId, verificationStatus }) {
   const upload = useUploadWorkerDocument(workerId);
   const verify = useVerifyWorkerDocument(workerId);
   const [type, setType] = useState("AADHAAR");
+  const [previewDoc, setPreviewDoc] = useState(null);
   const [error, setError] = useState(null);
   const fileRef = useRef(null);
 
@@ -43,12 +45,14 @@ export function WorkerDocumentsCard({ workerId, verificationStatus }) {
     let rejectionReason;
     if (!approve) {
       rejectionReason = window.prompt(`Reason for rejecting the ${doc.type.replace(/_/g, " ").toLowerCase()} (required):`);
-      if (!rejectionReason || rejectionReason.trim().length < 3) return;
+      if (!rejectionReason || rejectionReason.trim().length < 3) return false;
     }
     try {
       await verify.mutateAsync({ docId: doc._id, approve, rejectionReason });
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update the document.");
+      return false;
     }
   };
 
@@ -77,9 +81,13 @@ export function WorkerDocumentsCard({ workerId, verificationStatus }) {
           <span className="text-xs text-rust">“{doc.rejectionReason}”</span>
           }
               <span className="ml-auto flex items-center gap-2">
-                <a className="text-xs font-medium text-teal hover:underline" href={doc.url} target="_blank" rel="noreferrer">
-                  View
-                </a>
+                <button
+                  type="button"
+                  className="btn-primary inline-flex items-center gap-1.5 !px-3 !py-1.5 text-xs"
+                  onClick={() => setPreviewDoc(doc)}
+                >
+                  <Eye size={14} /> Preview &amp; verify
+                </button>
                 {doc.verificationStatus === "PENDING" &&
           <>
                     <button className="btn-ghost text-xs" disabled={verify.isPending} onClick={() => decide(doc, true)}>
@@ -124,11 +132,88 @@ export function WorkerDocumentsCard({ workerId, verificationStatus }) {
           {error}
         </p>
       }
+      {previewDoc && (
+        <DocumentPreviewModal
+          doc={previewDoc}
+          busy={verify.isPending}
+          onClose={() => setPreviewDoc(null)}
+          onDecide={async (approve) => {
+            const ok = await decide(previewDoc, approve);
+            if (ok !== false) setPreviewDoc(null);
+          }}
+        />
+      )}
       {allVerified && verificationStatus === "PENDING_VERIFICATION" &&
       <p className="mt-2 text-sm text-emerald-700">
           All documents verified — use “Verify documents” above to complete the step.
         </p>
       }
+    </div>
+  );
+}
+
+/**
+ * In-admin document preview: the admin SEES the actual uploaded file before
+ * pressing Verify/Reject. JPG/PNG/WebP render inline as an image; PDFs render
+ * in an embedded viewer. The declared document type, file type/size and
+ * upload date are shown above the preview so the admin can confirm e.g.
+ * "this really is an Aadhaar card" before approving it.
+ */
+function DocumentPreviewModal({ doc, busy, onClose, onDecide }) {
+  const mime = doc.metadata?.mimeType ?? "";
+  const isPdf = mime === "application/pdf" || /\.pdf($|\?)/i.test(doc.url ?? "");
+  const isImage = mime.startsWith("image/") || /\.(jpe?g|png|webp)($|\?)/i.test(doc.url ?? "");
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-graphite-950/70 p-0 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={`Preview ${doc.type}`}>
+      <div className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+        <div className="flex flex-wrap items-start gap-3 border-b border-steel-200 px-5 py-4">
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-base font-semibold text-graphite-900">{doc.type.replace(/_/g, " ")}</p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-graphite-500">
+              <StatusBadge status={doc.verificationStatus} />
+              <span>{mime || "Unknown file type"}</span>
+              {doc.metadata?.sizeBytes ? <span>· {Math.round(doc.metadata.sizeBytes / 1024)} KB</span> : null}
+              <span>· Uploaded {formatDate(doc.createdAt)}</span>
+            </p>
+            <p className="mt-1 text-xs text-graphite-500">Check that the file clearly matches this document type before verifying it.</p>
+          </div>
+          <a className="btn-ghost inline-flex items-center gap-1.5 text-xs" href={doc.url} target="_blank" rel="noreferrer">
+            <ExternalLink size={14} /> Open original
+          </a>
+          <button type="button" className="btn-ghost inline-flex items-center gap-1 text-xs" onClick={onClose} aria-label="Close preview">
+            <X size={16} /> Close
+          </button>
+        </div>
+
+        <div className="flex min-h-[320px] flex-1 items-center justify-center overflow-auto bg-steel-100 p-4">
+          {!doc.url ? (
+            <p className="text-sm text-graphite-500">No preview URL is available for this document.</p>
+          ) : isPdf ? (
+            <iframe title={`${doc.type} PDF preview`} src={doc.url} className="h-[68vh] w-full rounded-lg bg-white" />
+          ) : isImage ? (
+            <img src={doc.url} alt={`${doc.type.replace(/_/g, " ")} uploaded by worker`} className="max-h-[68vh] max-w-full rounded-lg object-contain shadow" />
+          ) : (
+            <div className="text-center">
+              <FileText className="mx-auto mb-2 text-graphite-400" size={36} />
+              <p className="text-sm text-graphite-500">This file type cannot be previewed inline.</p>
+              <a className="mt-2 inline-block text-sm font-medium text-teal hover:underline" href={doc.url} target="_blank" rel="noreferrer">Open the document</a>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-steel-200 px-5 py-4">
+          {doc.rejectionReason && <p className="mr-auto text-xs text-rust">Previous rejection: “{doc.rejectionReason}”</p>}
+          {doc.verificationStatus === "PENDING" ? (
+            <>
+              <button type="button" className="btn-ghost text-rust" disabled={busy} onClick={() => onDecide(false)}>Reject document</button>
+              <button type="button" className="btn-primary" disabled={busy} onClick={() => onDecide(true)}>{busy ? "Saving…" : "Verify document"}</button>
+            </>
+          ) : (
+            <p className="text-xs text-graphite-500">This document has already been {doc.verificationStatus.toLowerCase()}.</p>
+          )}
+          <button type="button" className="btn-ghost" onClick={onClose}>Close</button>
+        </div>
+      </div>
     </div>
   );
 }

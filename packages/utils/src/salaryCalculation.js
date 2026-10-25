@@ -5,6 +5,7 @@ exports.calculateDailyEarning = calculateDailyEarning;
 exports.calculateNetSalary = calculateNetSalary;
 exports.deriveSalaryRates = deriveSalaryRates;
 exports.expectedMonthlyGrossPaise = expectedMonthlyGrossPaise;
+exports.projectMonthlySalary = projectMonthlySalary;
 Object.defineProperty(exports, "multiplyPaiseByFactor", {
   enumerable: true,
   get: function () {
@@ -101,6 +102,44 @@ function deriveSalaryRates(rate = {}, rules = {}) {
     dailyRatePaise,
     hourlyRatePaise: Math.round(dailyRatePaise / fullDayHours),
     monthlySalaryPaise: Math.round(dailyRatePaise * workingDaysPerMonth)
+  };
+}
+
+/**
+ * Live current-month salary projection for the Worker page salary box.
+ *
+ * At registration (no attendance yet) this equals the full-month estimate:
+ * per-day wage x working days (default 26). As attendance is recorded, each
+ * marked day is treated as elapsed, whether PRESENT, absent, reduced-hours,
+ * HALF_DAY or leave; future unmarked working days are still expected at the
+ * full daily rate. Therefore:
+ * - absent / unpaid leave reduces the box by one daily wage;
+ * - a 2-hour day reduces it by (daily wage - 2 hours of earnings);
+ * - a 6-hour day reduces it by (daily wage - 6 hours of earnings);
+ * - paid advance / Kharchi / other deductions reduce take-home;
+ * - requested-but-unpaid amounts are reported separately as pending.
+ */
+function projectMonthlySalary(input = {}) {
+  const workingDaysPerMonth = Number(input.workingDaysPerMonth) > 0 ? Number(input.workingDaysPerMonth) : 26;
+  const dailyRatePaise = Math.max(0, Number(input.dailyRatePaise) || 0);
+  const totalEarningsPaise = Math.max(0, Number(input.totalEarningsPaise) || 0);
+  const elapsedDays = Math.max(0, Number(input.elapsedDays) || 0);
+  const remainingDays = Math.max(0, workingDaysPerMonth - elapsedDays);
+  const expectedRemainingEarningsPaise = Math.round(dailyRatePaise * remainingDays);
+  const projectedGrossPaise = (0, _money.addPaise)(totalEarningsPaise, expectedRemainingEarningsPaise);
+  const paidDeductionsPaise = (0, _money.addPaise)(input.advanceDeductionsPaise || 0, input.kharchiDeductionsPaise || 0, input.otherDeductionsPaise || 0);
+  const pendingDeductionsPaise = (0, _money.addPaise)(input.pendingAdvancePaise || 0, input.pendingKharchiPaise || 0);
+  const projectedNetPaise = Math.max(0, projectedGrossPaise - paidDeductionsPaise);
+  return {
+    workingDaysPerMonth,
+    elapsedDays,
+    remainingDays,
+    expectedRemainingEarningsPaise,
+    projectedGrossPaise,
+    paidDeductionsPaise,
+    pendingDeductionsPaise,
+    projectedNetPaise,
+    projectedNetAfterPendingPaise: Math.max(0, projectedNetPaise - pendingDeductionsPaise)
   };
 }
 

@@ -27,6 +27,11 @@ export function SalaryRatePanel({ workerId, isSuperAdmin }) {
   const rates = preview?.rates;
   const fullDayHours = rates?.fullDayHours ?? 8;
   const workingDays = rates?.workingDaysPerMonth ?? 26;
+  const projection = preview?.projection;
+  const attendance = preview?.attendance ?? {};
+  const monthSoFar = preview?.monthSoFar ?? {};
+  const totalDeductions = (monthSoFar.advanceDeductionsPaise ?? 0) + (monthSoFar.kharchiDeductionsPaise ?? 0) + (monthSoFar.otherDeductionsPaise ?? 0);
+  const elapsedDays = projection?.elapsedDays ?? attendance.markedDays ?? 0;
 
   // Prefill the editor with the worker's current effective per-day wage.
   useEffect(() => {
@@ -56,6 +61,35 @@ export function SalaryRatePanel({ workerId, isSuperAdmin }) {
     <div className="card p-4">
       <p className="mb-3 font-display text-xs font-semibold uppercase tracking-wide text-graphite-500">Per-day wage &amp; salary calculation</p>
 
+
+      {rates && (
+        <div className="mb-4 rounded-2xl bg-graphite-900 px-5 py-4 text-paper">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-paper/60">Total salary — current month (live estimate)</p>
+              <p className="font-display text-3xl font-semibold tabular-nums">{inr(preview.approximateMonthlyNetPaise)}</p>
+              <p className="mt-1 text-xs text-paper/60">
+                Starts at {inr(rates.dailyRatePaise)}/day × {workingDays} working days = {inr(preview.approximateMonthlyGrossPaise)} when the worker is newly created and fully present.
+              </p>
+            </div>
+            <div className="text-right text-xs text-paper/70">
+              <p>{elapsedDays} day{elapsedDays === 1 ? "" : "s"} recorded · {projection?.remainingDays ?? workingDays} expected remaining</p>
+              <p>{attendance.presentDays ?? 0} present · {attendance.halfDays ?? 0} half · {attendance.absentDays ?? 0} absent</p>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 border-t border-white/10 pt-3 text-xs sm:grid-cols-4">
+            <span>Earned so far <strong className="block text-sm text-paper">{inr(monthSoFar.totalEarningsPaise)}</strong></span>
+            <span>Advances settled <strong className="block text-sm text-paper">− {inr(monthSoFar.advanceDeductionsPaise)}</strong></span>
+            <span>Kharchi settled <strong className="block text-sm text-paper">− {inr(monthSoFar.kharchiDeductionsPaise)}</strong></span>
+            <span>Other deductions <strong className="block text-sm text-paper">− {inr(monthSoFar.otherDeductionsPaise)}</strong></span>
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-paper/55">
+            This total decreases immediately when a day is absent, a day is recorded for fewer hours (for example 2h or 6h instead of {fullDayHours}h), or an advance/Kharchi is settled. Future unrecorded working days are still expected at the full per-day wage.
+            {totalDeductions > 0 && <> Total settled deductions: {inr(totalDeductions)}.</>}
+            {(preview.pending?.advancePaise > 0 || preview.pending?.kharchiPaise > 0) && <> Requested but not yet settled: {inr((preview.pending?.advancePaise ?? 0) + (preview.pending?.kharchiPaise ?? 0))} (estimated take-home after those: {inr(preview.projectedNetAfterPendingPaise)}).</>}
+          </p>
+        </div>
+      )}
       {rates ? (
         <dl className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
           <div>
