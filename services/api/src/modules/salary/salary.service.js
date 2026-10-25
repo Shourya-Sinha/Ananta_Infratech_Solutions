@@ -292,10 +292,24 @@ exports.SalaryService = {
     const statement = await this.getStatement(workerId, month);
     const todayKey = new Date().toISOString().slice(0, 10);
     const today = statement.daily.find((d) => d.date === todayKey);
-    const workedDays = statement.attendance.presentDays + statement.attendance.paidLeaveDays + statement.attendance.halfDays * 0.5;
-    const remainingDays = Math.max(0, rates.workingDaysPerMonth - workedDays);
+    // A marked day is an elapsed day even when ABSENT, unpaid leave,
+    // half-day or reduced hours. Using only "worked" days would keep
+    // assuming that missed/short days can still be earned later, so the
+    // salary box would never decrease when attendance is recorded.
+    const elapsedDays = statement.attendance.markedDays ?? statement.attendance.presentDays + statement.attendance.paidLeaveDays + statement.attendance.halfDays + statement.attendance.absentDays + statement.attendance.unpaidLeaveDays + (statement.attendance.customDays ?? 0);
     const expectedGrossPaise = (0, _utils.expectedMonthlyGrossPaise)(rates);
-    const projectedGrossPaise = statement.totals.totalEarningsPaise + Math.round(rates.dailyRatePaise * remainingDays);
+    const projection = (0, _utils.projectMonthlySalary)({
+      dailyRatePaise: rates.dailyRatePaise,
+      workingDaysPerMonth: rates.workingDaysPerMonth,
+      totalEarningsPaise: statement.totals.totalEarningsPaise,
+      elapsedDays,
+      advanceDeductionsPaise: statement.totals.advanceDeductionsPaise,
+      kharchiDeductionsPaise: statement.totals.kharchiDeductionsPaise,
+      otherDeductionsPaise: statement.totals.otherDeductionsPaise,
+      pendingAdvancePaise: statement.pending.advancePaise,
+      pendingKharchiPaise: statement.pending.kharchiPaise
+    });
+    const projectedGrossPaise = projection.projectedGrossPaise;
     // For a MONTHLY-salaried worker the full-month expectation is the fixed
     // monthly salary itself; for hourly/daily it is rate × working days.
     const approximateMonthlyGrossPaise = profile.salaryMode === "MONTHLY" && profile.monthlySalaryPaise > 0 ? profile.monthlySalaryPaise : expectedGrossPaise;
@@ -322,6 +336,8 @@ exports.SalaryService = {
       approximateMonthlyGrossPaise,
       projectedGrossPaise,
       approximateMonthlyNetPaise: Math.max(0, (profile.salaryMode === "MONTHLY" ? approximateMonthlyGrossPaise : projectedGrossPaise) - statement.totals.advanceDeductionsPaise - statement.totals.kharchiDeductionsPaise - statement.totals.otherDeductionsPaise),
+      projection,
+      projectedNetAfterPendingPaise: projection.projectedNetAfterPendingPaise,
       pending: statement.pending,
       payrollStatus: statement.payrollStatus
     };

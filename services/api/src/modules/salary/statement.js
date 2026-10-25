@@ -150,6 +150,8 @@ function buildStatement({
       paidLeaveDays: attendance.paidLeaveDays ?? 0,
       unpaidLeaveDays: attendance.unpaidLeaveDays ?? 0,
       absentDays: attendance.absentDays ?? 0,
+      customDays: attendance.customDays ?? 0,
+      markedDays: attendance.markedDays ?? ((attendance.presentDays ?? 0) + (attendance.halfDays ?? 0) + (attendance.paidLeaveDays ?? 0) + (attendance.unpaidLeaveDays ?? 0) + (attendance.absentDays ?? 0) + (attendance.customDays ?? 0)),
       overtimeHours: attendance.overtimeHours ?? 0
     },
     balancePaise: lastEntry?.runningBalancePaise ?? null,
