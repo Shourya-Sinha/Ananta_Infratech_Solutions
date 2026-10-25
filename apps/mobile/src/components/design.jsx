@@ -93,26 +93,31 @@ export function MenuRow({ icon, tint = colors.graphite700, label, sub, onPress, 
 export function EarningsBars({ data = [], height = 118, color = colors.tealBright, emptyLabel = "No earnings yet" }) {
   const max = Math.max(1, ...data.map((d) => Math.abs(d.value ?? 0)));
   if (!data.length) return <Text style={styles.emptyText}>{emptyLabel}</Text>;
+  // With many bars (e.g. 14 on the Salary page) an exact "₹562.50" label
+  // cannot fit above a ~20px column on Android, so dense charts use a
+  // compact chart label — screens pair it with an exact-amount list below.
+  const dense = data.length > 9;
   return (
     <View style={[styles.bars, { height }]}>
       {data.map((d, i) => (
-        <Bar key={d.label ?? i} fraction={Math.abs(d.value ?? 0) / max} label={d.label} sub={d.sub} value={d.value ?? 0} height={height} color={d.value < 0 ? colors.rust : color} index={i} />
+        <Bar key={d.label ?? i} fraction={Math.abs(d.value ?? 0) / max} label={d.label} sub={d.sub} value={d.value ?? 0} dense={dense} height={height} color={d.value < 0 ? colors.rust : color} index={i} />
       ))}
     </View>
   );
 }
 
-function shortRupee(v) {
+function shortRupee(v, dense = false) {
   const abs = Math.abs(v);
   if (abs >= 1000) {
     const k = abs / 1000;
     return `${v < 0 ? "\u2212" : ""}\u20B9${k >= 100 ? Math.round(k) : k.toFixed(1).replace(/\.0$/, "")}k`;
   }
+  if (dense && abs % 1 !== 0) return `${v < 0 ? "\u2212" : ""}\u20B9${Math.round(abs)}`;
   const exact = abs % 1 === 0 ? String(abs) : abs.toFixed(2);
   return `${v < 0 ? "\u2212" : ""}\u20B9${exact}`;
 }
 
-function Bar({ fraction, label, sub, value, color, index }) {
+function Bar({ fraction, label, sub, value, dense, color, index }) {
   const h = useSharedValue(0);
   useEffect(() => {
     h.value = withDelay(index * 60, withTiming(Math.max(0.05, fraction), { duration: 650, easing: Easing.out(Easing.cubic) }));
@@ -120,7 +125,7 @@ function Bar({ fraction, label, sub, value, color, index }) {
   const style = useAnimatedStyle(() => ({ height: `${h.value * 100}%` }));
   return (
     <View style={styles.barCol}>
-      <Text style={styles.barValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{shortRupee(value)}</Text>
+      <Text style={[styles.barValue, dense && { fontSize: 8 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{shortRupee(value, dense)}</Text>
       <View style={styles.barTrack}>
         <Animated.View style={[styles.barFill, style]}>
           <LinearGradient colors={[color, colors.teal]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.barGradient} />
