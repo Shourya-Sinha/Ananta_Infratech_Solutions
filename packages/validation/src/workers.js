@@ -15,6 +15,13 @@ const workerRegisterSchema = exports.workerRegisterSchema = _zod.z.object({
   email: _zod.z.string().trim().email().optional(),
   workTypeId: _zod.z.string().min(1),
   siteId: _zod.z.string().min(1).optional(),
+  // The worker's ACTUAL agreed per-day wage in rupees — entered by the admin
+  // at registration, separate from the work type. The work type only
+  // identifies the trade (Mason, Foreman…); its catalogue rate is just a
+  // starting suggestion the admin can override with the real-world rate.
+  // Stored on the profile as salaryMode=DAILY. Optional: when omitted the
+  // work-type default applies at salary time, as before.
+  dailyRateRupees: _zod.z.number().positive().max(1000000).optional(),
   password: _auth.passwordSchema.optional(),
   // Duplicate handling: when the phone/email already belongs to an existing
   // (document-UNverified) worker, the API refuses with a 409 carrying the
