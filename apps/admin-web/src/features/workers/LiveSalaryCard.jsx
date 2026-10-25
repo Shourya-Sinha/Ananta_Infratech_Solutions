@@ -82,7 +82,29 @@ export function LiveSalaryCard({ workerId }) {
             </div>
           )}
 
-          <p className="mb-2 mt-5 font-display text-xs font-semibold uppercase tracking-wide text-graphite-500">Day by day</p>
+
+          {data.dailyAttendance && (
+            <>
+              <p className="mb-2 mt-5 font-display text-xs font-semibold uppercase tracking-wide text-graphite-500">
+                Attendance &amp; day pay{data.salaryRates ? ` — ${formatINR(rupees(data.salaryRates.dailyRatePaise))}/day · ${formatINR(rupees(data.salaryRates.hourlyRatePaise))}/hr` : ""}
+              </p>
+              {data.dailyAttendance.length === 0 ? (
+                <p className="text-sm text-graphite-400">No attendance marked this month.</p>
+              ) : (
+                <ul className="divide-y divide-steel-100 rounded-lg border border-steel-200">
+                  {data.dailyAttendance.map((d) => (
+                    <li key={d.date} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                      <span className="min-w-24 text-sm font-medium text-graphite-900">{formatDate(d.date)}</span>
+                      <span className={cx("rounded-full px-2 py-0.5 text-[11px] font-semibold", d.totalEarningPaise > 0 ? "bg-teal-50 text-teal" : "bg-red-50 text-rust")}>{d.label}</span>
+                      <span className="flex-1 text-xs text-graphite-500">{d.calculation}</span>
+                      <span className="text-sm font-semibold tabular-nums text-graphite-900">{formatINR(rupees(d.totalEarningPaise))}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+          <p className="mb-2 mt-5 font-display text-xs font-semibold uppercase tracking-wide text-graphite-500">Ledger — day by day</p>
           {data.daily.length === 0 ? (
             <p className="text-sm text-graphite-400">No ledger entries this month.</p>
           ) : (

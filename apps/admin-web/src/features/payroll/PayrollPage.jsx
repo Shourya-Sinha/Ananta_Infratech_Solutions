@@ -103,6 +103,11 @@ export function PayrollPage() {
     queryFn: async () => unwrap(api.get(`/salary/worker/${ledgerWorker}/summary?month=${month}`)),
     enabled: Boolean(ledgerWorker),
   });
+  const { data: dayStatement } = useQuery({
+    queryKey: ["salary", "statement", ledgerWorker, month],
+    queryFn: async () => unwrap(api.get(`/salary/worker/${ledgerWorker}/statement?month=${month}`)),
+    enabled: Boolean(ledgerWorker),
+  });
 
   const rows = data ?? [];
   const filtered = siteFilter ? rows.filter((r) => r.worker?.currentSite?._id === siteFilter || r.worker?.currentSite === siteFilter) : rows;
@@ -117,14 +122,23 @@ export function PayrollPage() {
     { gross: 0, overtime: 0, deductions: 0, net: 0 },
   );
 
+  const fmtH = (v) => {
+    const n = Math.round((Number(v) || 0) * 10) / 10;
+    return Number.isInteger(n) ? String(n) : String(n);
+  };
+  // Attendance summary in plain words + ACTUAL hours. A day marked PRESENT
+  // for only 6 hours reads "1 Present · 6h worked" — never a bare "1P",
+  // which looked like a full day even though pay was pro-rated (₹563).
   const daysCell = (r) => {
     const parts = [];
-    if (r.presentDays) parts.push(`${r.presentDays}P`);
-    if (r.halfDays) parts.push(`${r.halfDays}H`);
-    if (r.paidLeaveDays) parts.push(`${r.paidLeaveDays}PL`);
-    if (r.absentDays) parts.push(`${r.absentDays}A`);
-    if (r.unpaidLeaveDays) parts.push(`${r.unpaidLeaveDays}UL`);
-    if (r.overtimeHours) parts.push(`${r.overtimeHours}h OT`);
+    if (r.presentDays) parts.push(`${r.presentDays} Present`);
+    if (r.halfDays) parts.push(`${r.halfDays} Half`);
+    if (r.paidLeaveDays) parts.push(`${r.paidLeaveDays} Paid leave`);
+    if (r.absentDays) parts.push(`${r.absentDays} Absent (AB)`);
+    if (r.unpaidLeaveDays) parts.push(`${r.unpaidLeaveDays} Unpaid leave`);
+    if (r.totalHoursWorked) parts.push(`${fmtH(r.totalHoursWorked)}h worked`);
+    else if (r.overtimeHours) parts.push(`${fmtH(r.overtimeHours)}h OT`);
+    if (r.overtimeHours && r.totalHoursWorked) parts.push(` incl. ${fmtH(r.overtimeHours)}h OT`);
     return parts.length > 0 ? parts.join(" · ") : "—";
   };
 
@@ -169,7 +183,7 @@ export function PayrollPage() {
       cell: (r) => r.worker?.currentSite?.name ?? "—",
       className: "font-body",
     },
-    { header: "Days (P·H·PL·A·UL·OT)", cell: daysCell, className: "whitespace-normal" },
+    { header: "Attendance (days + hours)", cell: daysCell, className: "whitespace-normal" },
     { header: "Gross", cell: (r) => paise(r.grossEarningsPaise) },
     { header: "Overtime", cell: (r) => paise(r.overtimeEarningsPaise) },
     { header: "Advance ded.", cell: (r) => paise(r.advanceDeductionsPaise), className: "text-rust" },
@@ -185,7 +199,7 @@ export function PayrollPage() {
             className="text-xs font-medium text-amber-600 hover:underline"
             onClick={() => setLedgerWorker(r.worker?._id ?? r.worker)}
           >
-            Ledger
+            Days &amp; ledger
           </button>
           {r.status === "FINALIZED" && (
             <button
@@ -362,7 +376,7 @@ export function PayrollPage() {
       <DataTable columns={columns} rows={filtered} isLoading={isLoading} emptyTitle="No payroll calculated yet" emptyBody={`Click "Calculate month" to generate payroll for ${month} from recorded attendance.`} />
 
       <p className="text-xs text-graphite-500">
-        How every amount is calculated: <strong>Gross</strong> = Σ daily earnings — each attendance day pays (hours worked ÷ full-day hours) × daily rate; PRESENT/LEAVE_PAID count as a full day, HALF_DAY is pro-rated from hours, ABSENT/LEAVE_UNPAID earn nothing. <strong>Overtime</strong> = hours beyond the overtime threshold × hourly rate × overtime multiplier. <strong>Net</strong> = Gross + Overtime − Advance − Kharchi − Other deductions. Corrections/deletions reverse the affected ledger entries first, so figures always match the underlying attendance.
+        How every amount is calculated: <strong>Gross</strong> = Σ daily earnings — each attendance day pays (hours worked ÷ full-day hours) × daily rate, so a day marked PRESENT for only 6 hours at ₹750/day pays 6h × ₹93.75/hr = ₹562.50 (shown as ₹563), not a full ₹750 — open <strong>Days &amp; ledger</strong> on any worker to see every day (AB, 1h, 2h, 6h, 8h full day, overtime) with its exact calculation. PRESENT with no hours recorded and LEAVE_PAID count as a full day, HALF_DAY is pro-rated from hours, ABSENT/LEAVE_UNPAID earn nothing. <strong>Overtime</strong> = hours beyond the overtime threshold × hourly rate × overtime multiplier. <strong>Net</strong> = Gross + Overtime − Advance − Kharchi − Other deductions. Corrections/deletions reverse the affected ledger entries first, so figures always match the underlying attendance.
       </p>
 
       <div className="card p-4">
@@ -391,6 +405,33 @@ export function PayrollPage() {
             </div>
           )}
         </div>
+        {ledgerWorker && dayStatement?.dailyAttendance && (
+          <div className="mt-4 rounded-xl border border-steel-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-steel-200 bg-steel-50 px-3 py-2">
+              <p className="font-display text-xs font-semibold uppercase tracking-wide text-graphite-500">Day-by-day attendance &amp; how each day&apos;s pay was calculated</p>
+              {dayStatement.salaryRates && (
+                <p className="text-xs text-graphite-500">
+                  Rate: <span className="font-medium text-graphite-900">{paise(dayStatement.salaryRates.dailyRatePaise)}/day</span> · {paise(dayStatement.salaryRates.hourlyRatePaise)}/hr ({dayStatement.salaryRates.fullDayHours}h = full day)
+                </p>
+              )}
+            </div>
+            {dayStatement.dailyAttendance.length === 0 ? (
+              <p className="px-3 py-3 text-sm text-graphite-500">No attendance marked for this worker in {month} yet.</p>
+            ) : (
+              <ul className="divide-y divide-steel-100">
+                {dayStatement.dailyAttendance.map((d) => (
+                  <li key={d.date} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                    <span className="min-w-24 font-medium text-graphite-900">{formatDate(d.date)}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${d.totalEarningPaise > 0 ? "bg-teal-50 text-teal" : "bg-red-50 text-rust"}`}>{d.label}</span>
+                    <span className="flex-1 text-xs text-graphite-500">{d.calculation}</span>
+                    <span className="font-mono font-semibold tabular-nums text-graphite-900">{paise(d.totalEarningPaise)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="border-t border-steel-100 px-3 py-2 text-[11px] text-graphite-400">Day pay is before that day&apos;s advance/Kharchi deductions — see the ledger below for debits and the running balance. Example: a 6h day at ₹750/day (₹93.75/hr) pays 6 × ₹93.75 = ₹562.50, shown rounded as ₹563.</p>
+          </div>
+        )}
         {ledgerWorker ? (
           <div className="mt-4">
             <DataTable columns={ledgerColumns} rows={ledger} isLoading={false} emptyTitle="No ledger entries" emptyBody="This worker has no salary ledger entries for the selected month." />
