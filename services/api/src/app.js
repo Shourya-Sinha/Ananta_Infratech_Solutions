@@ -35,6 +35,8 @@ var _media = require("./modules/media/media.routes");
 var _company = require("./modules/company/company.routes");
 var _openapi = require("./config/openapi");
 var _corsConfig = require("./config/cors");
+var _versionGate = require("./middleware/versionGate");
+var _version = require("./config/version");
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function createApp() {
   const app = (0, _express.default)();
@@ -93,6 +95,16 @@ function createApp() {
       }
     });
   });
+  // Total version control: public version contract (exempt from the gate so
+  // an outdated client can still learn which version it must update to),
+  // then the strict gate in front of every business router.
+  const versionHandler = (req, res) => {
+    const client = String(req.headers["x-client"] ?? req.query.client ?? "").toLowerCase() || null;
+    res.json({ success: true, data: (0, _version.getVersionInfo)(client) });
+  };
+  app.get("/api/v1/system/version", versionHandler);
+  app.get("/api/v1/version", versionHandler);
+  app.use("/api/v1", _versionGate.versionGate);
   (0, _openapi.mountApiDocs)(app); // GET /api/v1/docs (Swagger UI), /api/v1/openapi.json
 
   app.use("/api/v1/auth", _auth.authRouter);

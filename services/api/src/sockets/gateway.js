@@ -12,6 +12,7 @@ var _corsConfig = require("../config/cors");
 var _SiteAssignment = require("../db/models/SiteAssignment");
 var _WorkerProfile = require("../db/models/WorkerProfile");
 var _Site = require("../db/models/Site");
+var _version = require("../config/version");
 let io;
 function initSocketGateway(httpServer) {
   io = new _socket.Server(httpServer, {
@@ -27,6 +28,13 @@ function initSocketGateway(httpServer) {
       const token = socket.handshake.auth?.token;
       if (!token) return next(new Error("Missing auth token"));
       const payload = _token.TokenService.verifyAccessToken(token);
+      // Total version control on sockets too: an official client that
+      // declares a client+version in the handshake must match the release.
+      const declaredClient = socket.handshake.auth?.client;
+      const declaredVersion = socket.handshake.auth?.version;
+      if ((declaredClient === "mobile" || declaredClient === "admin-web") && declaredVersion !== _version.RELEASE_VERSION) {
+        return next(new Error("FORCE_UPDATE: client version does not match the server release. Please update."));
+      }
       socket.data.userId = payload.sub;
       socket.data.role = payload.role;
       next();

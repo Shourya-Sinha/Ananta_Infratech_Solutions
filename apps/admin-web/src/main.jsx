@@ -2,6 +2,8 @@ import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { AppRouter } from "@/app/router";
+import { ForceUpdateModal } from "@/components/ui/ForceUpdateModal";
+import { checkServerVersion } from "@/lib/version";
 import "@/styles/globals.css";
 
 const queryClient = new QueryClient({
@@ -15,12 +17,18 @@ const queryClient = new QueryClient({
 // immediate unmount and the second instance never becomes ready — the video
 // sits on "Loading player…" or error 153. Production builds do not do this,
 // but local dev is where the toggle player is tested.
+// Total version control: verify this build against the server on load
+// and whenever the tab regains focus (catches deploys while a tab is open).
+checkServerVersion();
+window.addEventListener("focus", checkServerVersion);
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <QueryClientProvider client={queryClient}>
     {/* Opt into the v7 behaviours early so the dev console stays free of
         React Router future-flag warnings. */}
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AppRouter />
+      <ForceUpdateModal />
     </BrowserRouter>
   </QueryClientProvider>
 );

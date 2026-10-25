@@ -6,6 +6,7 @@ import { Button } from "@/components/ui";
 import { useAuthStore } from "@/stores/authStore";
 import { useLogout } from "@/features/auth/api";
 import { colors, spacing } from "@/theme";
+import { BrandFooter } from "@/components/BrandFooter";
 
 /**
  * Worker: "Services" hub. Manager/Admin: "More" hub.
@@ -68,8 +69,14 @@ export function ProfileScreen() {
         <Row label="Role" value={role?.replace("_", " ") ?? "—"} />
         <Row label="App" value="Ananta Infratech v1.0.0" />
       </Card>
+      <SectionTitle>About</SectionTitle>
+      <Card style={{ gap: spacing.sm, marginBottom: spacing.md }}>
+        <Row label="Company" value="Ananta Infratech Solutions" />
+        <Row label="Developed & maintained by" value="Shourya" />
+        <Row label="Support" value="Chat with the office (Support)" />
+      </Card>
       <Button title="Sign out" onPress={() => logout.mutate()} variant="danger" />
-      <Text style={styles.footer}>Made for the Ananta Infratech workforce</Text>
+      <BrandFooter />
     </ScrollView>
   );
 }

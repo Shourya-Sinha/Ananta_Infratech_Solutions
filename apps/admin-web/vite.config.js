@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
+import fs from "node:fs";
 
 const API_PROXY_TARGET = process.env.VITE_API_PROXY_TARGET ?? "http://localhost:4000";
 
@@ -35,7 +36,13 @@ function configureApiProxy(proxy) {
   });
 }
 
+// Total version control: bake the single release version (the same one the
+// API enforces) into this UI build at compile time.
+const releaseVersionSource = fs.readFileSync(path.resolve(__dirname, "../../packages/constants/src/version.js"), "utf8");
+const RELEASE_VERSION = /RELEASE_VERSION = "([^"]+)"/.exec(releaseVersionSource)?.[1] ?? "0.0.0";
+
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(RELEASE_VERSION) },
   plugins: [react()],
   resolve: {
     alias: {

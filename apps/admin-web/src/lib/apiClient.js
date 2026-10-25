@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { useAuthStore } from "@/stores/authStore";
+import { APP_VERSION, useForceUpdateStore } from "@/lib/version";
 
 export const api = axios.create({ baseURL: "/api/v1", timeout: 20000 });
 
@@ -17,8 +18,32 @@ function getDeviceId() {
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Total version control: every request declares this UI build.
+  config.headers["x-client"] = "admin-web";
+  config.headers["x-app-version"] = APP_VERSION;
   return config;
 });
+
+function handleVersionSignals(responseOrError) {
+  const headers = responseOrError?.headers ?? responseOrError?.response?.headers;
+  const serverRelease = headers?.["x-release-version"];
+  if (serverRelease && serverRelease !== APP_VERSION) {
+    useForceUpdateStore.getState().trigger({
+      currentVersion: APP_VERSION,
+      requiredVersion: serverRelease,
+      message: "A new version of the admin panel has been deployed on the server."
+    });
+  }
+  const data = responseOrError?.data ?? responseOrError?.response?.data;
+  if (responseOrError?.response?.status === 426 || data?.error?.code === "FORCE_UPDATE") {
+    const d = data?.error?.details ?? {};
+    useForceUpdateStore.getState().trigger({
+      currentVersion: d.currentVersion ?? APP_VERSION,
+      requiredVersion: d.requiredVersion ?? serverRelease,
+      message: data?.error?.message
+    });
+  }
+}
 
 let refreshPromise = null;
 
@@ -44,8 +69,12 @@ async function refreshAccessToken() {
 }
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    handleVersionSignals(res);
+    return res;
+  },
   async (error) => {
+    handleVersionSignals(error);
     const original = error.config;
 
     if (error.response?.status === 401 && original && !original._retried) {
