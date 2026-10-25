@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { RootNavigator } from "@/app/RootNavigator";
+import { FinanceSocketSync } from "@/lib/financeSocketSync";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -14,6 +15,7 @@ export default function App() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <StatusBar style="dark" />
+        <FinanceSocketSync />
         <RootNavigator />
       </QueryClientProvider>
     </SafeAreaProvider>

@@ -17,6 +17,7 @@ var _argon2 = require("argon2");
 var _nodeCrypto = require("node:crypto");
 var _duplicatePolicy = require("./duplicatePolicy");
 var _utils = require("@ananta/utils");
+var _financeEvents = require("../../sockets/financeEvents");
 exports.WorkerService = {
   /**
    * Apply the admin-entered per-day wage to a profile (salaryMode=DAILY).
@@ -30,6 +31,7 @@ exports.WorkerService = {
     profile.salaryRateUpdatedBy = actorId;
     profile.salaryRateUpdatedAt = new Date();
     await profile.save();
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "SALARY_RATE_UPDATED", workerId: profile._id, siteId: profile.currentSite });
     return profile;
   },
 

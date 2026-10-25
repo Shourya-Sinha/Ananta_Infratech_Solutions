@@ -4,11 +4,11 @@ Object.defineProperty(exports, "__esModule", {
 var _MonthlyPayroll = require("../../db/models/MonthlyPayroll");
 var _SalaryLedger = require("../../db/models/SalaryLedger");
 var _WorkerProfile = require("../../db/models/WorkerProfile");
-var _salary = require("../salary/salary.service");
 var _AppError = require("../../errors/AppError");
 var _audit = require("../auditLogs/audit.service");
 var _notification = require("../notifications/notification.service");
-var _gateway = require("../../sockets/gateway");
+var _salary = require("../salary/salary.service");
+var _financeEvents = require("../../sockets/financeEvents");
 var _sharedTypes = require("@ananta/shared-types");
 var _utils = require("@ananta/utils");
 var _Attendance = require("../../db/models/Attendance");
@@ -121,6 +121,7 @@ exports.PayrollService = {
         workerId: payroll.worker.toString(),
         month
       });
+      (0, _financeEvents.emitFinanceUpdate)({ reason: "SALARY_MONTH_FINALIZED", workerId: payroll.worker });
     }
     await _audit.AuditService.log({
       actor: actorId,
@@ -218,6 +219,7 @@ exports.PayrollService = {
       targetId: payroll._id.toString(),
       after: { month, receiptId: savedReceipt?._id?.toString(), transactionId: savedReceipt?.transactionId }
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "PAYROLL_WORKER_PAID", workerId, month });
     return { payroll, receipt: savedReceipt };
   },
   async listWorkerReceipts(workerId) {

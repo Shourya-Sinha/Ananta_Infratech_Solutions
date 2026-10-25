@@ -7,6 +7,7 @@ var _Site = require("../../db/models/Site");
 var _AppError = require("../../errors/AppError");
 var _audit = require("../auditLogs/audit.service");
 var _gateway = require("../../sockets/gateway");
+var _financeEvents = require("../../sockets/financeEvents");
 var _sharedTypes = require("@ananta/shared-types");
 var _utils = require("@ananta/utils");
 var _mongoose = require("mongoose");
@@ -62,6 +63,7 @@ exports.FinanceService = {
       siteId: site._id.toString(),
       investmentId: investment._id.toString()
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "SITE_INVESTMENT_ADDED", siteId: site._id });
 
     // Investments affect the site's net position — broadcast the refreshed figure.
     const profitLoss = await this.getSiteProfitLoss(site._id.toString());
@@ -69,6 +71,7 @@ exports.FinanceService = {
       siteId: site._id.toString(),
       profitLoss: profitLoss.profitLoss
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "SITE_PROFIT_UPDATED", siteId: site._id });
     return investment;
   },
   async listInvestments(filter) {
@@ -113,6 +116,7 @@ exports.FinanceService = {
       siteId: original.site.toString(),
       investmentId: reversal._id.toString()
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "SITE_INVESTMENT_REVERSED", siteId: original.site });
     return reversal;
   },
   async addCapital(input, actorId) {
@@ -139,6 +143,7 @@ exports.FinanceService = {
     (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).emit(_sharedTypes.SOCKET_EVENTS.SITE_CAPITAL_UPDATED, {
       siteId: site._id.toString()
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "SITE_CAPITAL_UPDATED", siteId: site._id });
     return capital;
   },
   async recordTransaction(input, actorId) {
@@ -167,6 +172,7 @@ exports.FinanceService = {
       siteId: site._id.toString(),
       transactionId: transaction._id.toString()
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "SITE_INCOME_ADDED", siteId: site._id });
 
     // Recompute + broadcast the updated profit figure so dashboards refresh live.
     const profitLoss = await this.getSiteProfitLoss(site._id.toString());
@@ -174,6 +180,7 @@ exports.FinanceService = {
       siteId: site._id.toString(),
       profitLoss: profitLoss.profitLoss
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "SITE_PROFIT_UPDATED", siteId: site._id });
     return transaction;
   },
   /**
@@ -327,6 +334,11 @@ exports.FinanceService = {
       targetId: billing._id.toString(),
       after: { site: site._id.toString(), month: input.month, billedAmountRupees: input.billedAmountRupees, receivedAmountRupees: input.receivedAmountRupees }
     });
+    (0, _financeEvents.emitToRooms)("site:billing_updated", {
+      siteId: site._id.toString(),
+      month: input.month
+    }, { siteId: site._id });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "SITE_BILLING_UPDATED", siteId: site._id, month: input.month });
     return billing;
   },
   async getSiteBilling(siteId, month) {
@@ -830,6 +842,7 @@ exports.FinanceService = {
       after: { amountRupees: input.amountRupees, category: input.category }
     });
     (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).emit(_sharedTypes.SOCKET_EVENTS.COMPANY_EXPENSE_ADDED, { expenseId: expense._id.toString() });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "COMPANY_EXPENSE_ADDED" });
     return expense;
   },
   async reverseCompanyExpense(expenseId, actorId) {
@@ -848,6 +861,7 @@ exports.FinanceService = {
     });
     await _audit.AuditService.log({ actor: actorId, action: "COMPANY_EXPENSE_REVERSED", targetType: "CompanyExpense", targetId: reversal._id.toString() });
     (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).emit(_sharedTypes.SOCKET_EVENTS.COMPANY_EXPENSE_REVERSED, { expenseId: reversal._id.toString() });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "COMPANY_EXPENSE_REVERSED" });
     return reversal;
   },
   async listCompanyExpenses(filter) {
