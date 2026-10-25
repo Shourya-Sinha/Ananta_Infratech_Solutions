@@ -8,6 +8,7 @@ var _AppError = require("../../errors/AppError");
 var _audit = require("../auditLogs/audit.service");
 var _notification = require("../notifications/notification.service");
 var _gateway = require("../../sockets/gateway");
+var _financeEvents = require("../../sockets/financeEvents");
 var _sharedTypes = require("@ananta/shared-types");
 var _utils = require("@ananta/utils");
 exports.KharchiService = {
@@ -38,6 +39,7 @@ exports.KharchiService = {
       requestId: request._id.toString(),
       workerId: profile._id.toString()
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "KHARCHI_CREATED", workerId: profile._id });
     return request;
   },
   /**
@@ -102,9 +104,11 @@ exports.KharchiService = {
       requestId: request._id.toString(),
       workerId: profile._id.toString()
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "KHARCHI_CREATED", workerId: profile._id });
     (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).to(_sharedTypes.ROOMS.worker(profile._id.toString())).emit(_sharedTypes.SOCKET_EVENTS.KHARCHI_APPROVED, {
       requestId: request._id.toString()
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "KHARCHI_APPROVED", workerId: profile._id });
     return request;
   },
   async approve(requestId, approvedBy) {
@@ -142,6 +146,7 @@ exports.KharchiService = {
     (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).to(_sharedTypes.ROOMS.worker(request.worker.toString())).emit(_sharedTypes.SOCKET_EVENTS.KHARCHI_APPROVED, {
       requestId: request._id.toString()
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "KHARCHI_APPROVED", workerId: request.worker });
     return request;
   },
   async reject(requestId, rejectionReason, rejectedBy) {
@@ -173,6 +178,7 @@ exports.KharchiService = {
     (0, _gateway.getIO)().to(_sharedTypes.ROOMS.admin()).to(_sharedTypes.ROOMS.worker(request.worker.toString())).emit(_sharedTypes.SOCKET_EVENTS.KHARCHI_REJECTED, {
       requestId: request._id.toString()
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "KHARCHI_REJECTED", workerId: request.worker });
     return request;
   },
   async list(filter) {

@@ -8,6 +8,7 @@ var _salary = require("../salary/salary.service");
 var _AppError = require("../../errors/AppError");
 var _audit = require("../auditLogs/audit.service");
 var _gateway = require("../../sockets/gateway");
+var _financeEvents = require("../../sockets/financeEvents");
 var _sharedTypes = require("@ananta/shared-types");
 function normalizeDate(dateStr) {
   // Store attendance dates at UTC midnight so "one record per worker per day" is unambiguous.
@@ -102,6 +103,7 @@ exports.AttendanceService = {
         workerId: profile._id.toString(),
         month
       });
+      (0, _financeEvents.emitFinanceUpdate)({ reason: "ATTENDANCE_EARNING", workerId: profile._id, siteId: site._id, month });
     }
     return {
       attendance,
@@ -196,6 +198,7 @@ exports.AttendanceService = {
       attendanceId: correction._id.toString(),
       originalAttendanceId: original._id.toString()
     });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "ATTENDANCE_CORRECTED", workerId: original.worker, siteId: original.site, month });
     return {
       correction,
       reversedEntries: true,
@@ -284,6 +287,7 @@ exports.AttendanceService = {
         workerId: attendance.worker.toString(),
         month
       });
+      (0, _financeEvents.emitFinanceUpdate)({ reason: "ATTENDANCE_DELETED", workerId: attendance.worker, siteId: attendance.site, month });
     }
     return {
       deleted: true,

@@ -94,7 +94,10 @@ function pageMeta(pathname) {
   return match ?? { label: "Dashboard", icon: LayoutDashboard };
 }
 
+import { useFinanceSocketSync } from "@/hooks/useFinanceSocketSync";
+
 export function AppShell() {
+  useFinanceSocketSync(); // live finance/salary/payroll refresh via WebSocket
   const user = useAuthStore((s) => s.user);
   const logout = useLogout();
   const location = useLocation();

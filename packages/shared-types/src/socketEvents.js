@@ -21,6 +21,15 @@ const SOCKET_EVENTS = exports.SOCKET_EVENTS = {
   ATTENDANCE_DELETED: "attendance:deleted",
   ATTENDANCE_APPROVED: "attendance:approved",
   SALARY_RECALCULATED: "salary:recalculated",
+  SALARY_RATE_UPDATED: "salary:rate_updated",
+  // Unified financial-change signal: ANY mutation that moves money (wage /
+  // rate edits, attendance earnings, advances, Kharchi, site income/expense/
+  // investment/billing, company expenses, payroll) emits this ONE event so
+  // every client can refresh all finance/salary/payroll totals immediately
+  // instead of subscribing to a dozen specialised events. Payload:
+  // { reason, workerId?, siteId?, month?, at }.
+  FINANCE_UPDATED: "finance:updated",
+  SITE_BILLING_UPDATED: "site:billing_updated",
   SALARY_LEDGER_UPDATED: "salary:ledger_updated",
   SALARY_MONTH_FINALIZED: "salary:month_finalized",
   ADVANCE_CREATED: "advance:created",

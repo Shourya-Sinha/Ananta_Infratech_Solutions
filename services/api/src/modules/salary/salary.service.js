@@ -11,6 +11,7 @@ var _utils = require("@ananta/utils");
 var _statement = require("./statement");
 var _Requests = require("../../db/models/Requests");
 var _AppError = require("../../errors/AppError");
+var _financeEvents = require("../../sockets/financeEvents");
 function toPaiseNumber(decimal) {
   return Number(decimal.toString());
 }
@@ -340,6 +341,14 @@ exports.SalaryService = {
     profile.salaryRateUpdatedBy = actorId;
     profile.salaryRateUpdatedAt = new Date();
     await profile.save();
+    // Live: every connected admin/manager/worker client refreshes rates,
+    // previews, payroll and finance totals the moment a wage changes.
+    (0, _financeEvents.emitToRooms)("salary:rate_updated", {
+      workerId: profile._id.toString(),
+      salaryMode: profile.salaryMode,
+      dailyRatePaise: profile.dailyRatePaise ?? null
+    }, { workerId: profile._id, siteId: profile.currentSite });
+    (0, _financeEvents.emitFinanceUpdate)({ reason: "SALARY_RATE_UPDATED", workerId: profile._id, siteId: profile.currentSite });
     const rules = await _salaryRule.SalaryRuleService.getActiveRuleSet();
     return (0, _utils.deriveSalaryRates)({
       salaryMode: profile.salaryMode,
