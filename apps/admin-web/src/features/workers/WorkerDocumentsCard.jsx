@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, ExternalLink, FileText, X } from "lucide-react";
 import { useUploadWorkerDocument, useVerifyWorkerDocument, useWorkerDocuments } from "./api";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -163,10 +163,38 @@ function DocumentPreviewModal({ doc, busy, onClose, onDecide }) {
   const mime = doc.metadata?.mimeType ?? "";
   const isPdf = mime === "application/pdf" || /\.pdf($|\?)/i.test(doc.url ?? "");
   const isImage = mime.startsWith("image/") || /\.(jpe?g|png|webp)($|\?)/i.test(doc.url ?? "");
+
+  // Close must always be reachable: Escape key, clicking the dark backdrop,
+  // the floating Close button, or the footer Close button. Closing returns
+  // to the document list, where Verify/Reject are still available per row.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-graphite-950/70 p-0 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={`Preview ${doc.type}`}>
-      <div className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
-        <div className="flex flex-wrap items-start gap-3 border-b border-steel-200 px-5 py-4">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-graphite-950/70 p-0 sm:items-center sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Preview ${doc.type}`}
+      onClick={onClose}
+    >
+      <div
+        className="relative flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close document preview"
+          title="Close preview"
+          className="absolute right-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-full bg-graphite-900 px-3.5 py-2 text-xs font-semibold text-white shadow-lg ring-2 ring-white/70 transition hover:bg-rust focus:outline-none focus-visible:ring-4 focus-visible:ring-teal"
+        >
+          <X size={16} /> Close
+        </button>
+        <div className="flex flex-wrap items-start gap-3 border-b border-steel-200 px-5 py-4 pr-28">
           <div className="min-w-0 flex-1">
             <p className="font-display text-base font-semibold text-graphite-900">{doc.type.replace(/_/g, " ")}</p>
             <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-graphite-500">
@@ -180,9 +208,6 @@ function DocumentPreviewModal({ doc, busy, onClose, onDecide }) {
           <a className="btn-ghost inline-flex items-center gap-1.5 text-xs" href={doc.url} target="_blank" rel="noreferrer">
             <ExternalLink size={14} /> Open original
           </a>
-          <button type="button" className="btn-ghost inline-flex items-center gap-1 text-xs" onClick={onClose} aria-label="Close preview">
-            <X size={16} /> Close
-          </button>
         </div>
 
         <div className="flex min-h-[320px] flex-1 items-center justify-center overflow-auto bg-steel-100 p-4">
@@ -211,7 +236,7 @@ function DocumentPreviewModal({ doc, busy, onClose, onDecide }) {
           ) : (
             <p className="text-xs text-graphite-500">This document has already been {doc.verificationStatus.toLowerCase()}.</p>
           )}
-          <button type="button" className="btn-ghost" onClick={onClose}>Close</button>
+          <button type="button" className="btn-accent inline-flex items-center gap-1.5" onClick={onClose}><X size={15} /> Close preview</button>
         </div>
       </div>
     </div>

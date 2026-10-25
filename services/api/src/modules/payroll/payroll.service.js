@@ -9,6 +9,7 @@ var _audit = require("../auditLogs/audit.service");
 var _notification = require("../notifications/notification.service");
 var _salary = require("../salary/salary.service");
 var _financeEvents = require("../../sockets/financeEvents");
+var _gateway = require("../../sockets/gateway");
 var _sharedTypes = require("@ananta/shared-types");
 var _utils = require("@ananta/utils");
 var _Attendance = require("../../db/models/Attendance");
