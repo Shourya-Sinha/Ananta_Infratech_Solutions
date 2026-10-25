@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useWorkers } from "./api";
 import { AddWorkerPanel } from "./AddWorkerPanel";
+import { AddManagerPanel } from "./AddManagerPanel";
 import { DataTable } from "@/components/ui/DataDisplay";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuthStore } from "@/stores/authStore";
@@ -24,7 +25,8 @@ export function WorkersListPage() {
   // straight into a pre-filtered view instead of a generic list.
   const [status, setStatus] = useState(searchParams.get("status") ?? "");
   const [search, setSearch] = useState("");
-  const [showAdd, setShowAdd] = useState(false);
+  const [showAdd, setShowAdd] = useState(searchParams.get("add") === "worker");
+  const [showAddManager, setShowAddManager] = useState(searchParams.get("add") === "manager");
 
   const filters = {};
   if (status) filters.verificationStatus = status;
@@ -51,14 +53,23 @@ export function WorkersListPage() {
           <p className="text-sm text-graphite-500">{data?.total ?? 0} total</p>
         </div>
         {isSuperAdmin &&
-        <button className="btn-primary" onClick={() => setShowAdd((v) => !v)}>
+        <div className="flex gap-2">
+          <button className="btn-primary" onClick={() => { setShowAdd((v) => !v); setShowAddManager(false); }}>
             {showAdd ? "Close" : "+ Add worker"}
           </button>
+          <button className="btn-accent" onClick={() => { setShowAddManager((v) => !v); setShowAdd(false); }}>
+            {showAddManager ? "Close" : "+ Add manager"}
+          </button>
+        </div>
         }
       </div>
 
       {showAdd && isSuperAdmin &&
       <AddWorkerPanel />
+      }
+
+      {showAddManager && isSuperAdmin &&
+      <AddManagerPanel />
       }
 
       <div className="flex flex-wrap gap-3">

@@ -30,6 +30,14 @@ workTypesRouter.get("/", (0, _rbac.requirePermission)("worker.read"), (0, _error
   };
   res.json(body);
 }));
+// Re-run the default-trades seed on demand (the same sync that runs at API
+// startup) — lets an admin fix an empty dropdown without restarting.
+workTypesRouter.post("/seed-defaults", (0, _rbac.requirePermission)("worker.changeWorkType"), (0, _errorHandler.asyncHandler)(async (req, res) => {
+  const { syncWorkTypes } = require("../../db/syncWorkTypes");
+  const result = await syncWorkTypes(req.auth.userId);
+  const body = { success: true, data: result };
+  res.status(201).json(body);
+}));
 const createSchema = _zod.z.object({
   name: _zod.z.string().trim().min(2).max(80),
   code: _zod.z.string().trim().min(2).max(20),

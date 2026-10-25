@@ -484,3 +484,9 @@ bookmarkable and shareable.
   pipeline, so paid leave credits salary exactly like manager-marked leave,
   and the worker is notified. Manageable from Admin Web and mobile.
 - New permissions are auto-synced into existing databases on API boot.
+
+## Work types, manager registration & site editing (latest)
+
+- **Work types seeded automatically**: 30 standard construction trades (Mason, Helper, Foreman, Carpenter, Shuttering Carpenter, Bar Bender, Electrician, Plumber, Painter, Welder, operators…) with indicative ₹/day rates are inserted on API startup and by `npm run seed` — so the Add Worker work-type dropdown is never empty. Seeding inserts only missing codes and never overwrites admin-edited rates; **Work Types → "Load standard construction work types"** (or the same button in Add Worker when empty) re-runs it on demand (`POST /work-types/seed-defaults`).
+- **Register a Manager from Workers**: **Workers → + Add manager** creates the MANAGER login (phone + one-time password shown once, or an admin-chosen password) and can assign a site in the same step. Managers then log in to the mobile app to mark that site's attendance.
+- **Site details fully editable**: client, project type, start date, expected completion, budget, manager, description and status can all be set at site creation or via **Sites → Details → Edit**; choosing "Unassigned"/empty clears them (nullable PATCH). Unassigned sites also get a one-click **Assign manager** control in view mode, and empty manager lists link straight to manager registration. Assigning validates the account is really a Manager/Admin.

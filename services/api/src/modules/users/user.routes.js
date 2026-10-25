@@ -41,7 +41,8 @@ const createUserSchema = _zod.z.object({
   name: _zod.z.string().trim().min(2).max(120),
   phone: _validation.phoneSchema,
   email: _zod.z.string().trim().email().optional(),
-  roleKey: _zod.z.string().trim().min(3).max(40)
+  roleKey: _zod.z.string().trim().min(3).max(40),
+  password: _validation.passwordSchema.optional()
 });
 usersRouter.post("/", (0, _rbac.requirePermission)("user.create"), (0, _errorHandler.asyncHandler)(async (req, res) => {
   const input = createUserSchema.parse(req.body);

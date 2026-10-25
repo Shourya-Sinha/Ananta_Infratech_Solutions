@@ -69,7 +69,7 @@ export function SitesListPage() {
   useSocketInvalidate("site:updated", [["sites"]]);
 
   const [showForm, setShowForm] = useState(false);
-  const [showOptional, setShowOptional] = useState(false);
+  const [showOptional, setShowOptional] = useState(true);
   const [form, setForm] = useState({
     name: "",
     code: "",

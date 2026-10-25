@@ -176,3 +176,35 @@ export function useAssignmentHistory(workerId) {
     enabled: Boolean(workerId),
   });
 }
+/** Load the standard construction work types (Mason, Helper, Carpenter…) when the list is empty. */
+export function useSeedDefaultWorkTypes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => unwrap(api.post("/work-types/seed-defaults")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["work-types"] })
+  });
+}
+
+/**
+ * Register a Manager from the Workers/Sites flow: creates the MANAGER login
+ * account (credentials returned once) and optionally assigns them to a site
+ * immediately (Site.manager). The manager can then log in to the mobile app
+ * and mark attendance for that site's workers.
+ */
+export function useRegisterManager() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ siteId, ...userInput }) => {
+      const result = await unwrap(api.post("/users", { ...userInput, roleKey: "MANAGER" }));
+      let assignedSite = null;
+      if (siteId) {
+        assignedSite = await unwrap(api.patch(`/sites/${siteId}`, { manager: result.user._id }));
+      }
+      return { ...result, assignedSite };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["sites"] });
+    }
+  });
+}
