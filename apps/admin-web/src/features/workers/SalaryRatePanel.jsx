@@ -3,7 +3,7 @@ import { useSalaryPreview, useSetSalaryRate } from "./api";
 import { formatINR } from "@/lib/format";
 import { useToast } from "@/components/ui/Toast";
 
-const inr = (paise) => formatINR(Math.round((paise ?? 0) / 100));
+const inr = (paise) => formatINR((paise ?? 0) / 100);
 
 /**
  * Per-day wage — view, live calculation preview, and EDIT (Super Admin).
@@ -39,7 +39,7 @@ export function SalaryRatePanel({ workerId, isSuperAdmin }) {
 
   // Prefill the editor with the worker's current effective per-day wage.
   useEffect(() => {
-    if (rates?.dailyRatePaise) setAmount(String(Math.round(rates.dailyRatePaise / 100)));
+    if (rates?.dailyRatePaise) setAmount(String(rates.dailyRatePaise / 100));
   }, [rates?.dailyRatePaise]);
 
   const entered = amount === "" ? NaN : Number(amount);
@@ -152,7 +152,7 @@ export function SalaryRatePanel({ workerId, isSuperAdmin }) {
           {derived && (
             <p className="mt-2 text-xs text-graphite-500">
               At <span className="font-medium text-graphite-900">{formatINR(derived.daily)}/day</span> →{" "}
-              per hour <span className="font-medium text-graphite-900">{formatINR(Math.round(derived.hourly))}</span> ·{" "}
+              per hour <span className="font-medium text-graphite-900">{formatINR(derived.hourly)}</span> ·{" "}
               approx. monthly salary <span className="font-medium text-graphite-900">{formatINR(derived.monthly)}</span>{" "}
               ({workingDays} working days).
             </p>

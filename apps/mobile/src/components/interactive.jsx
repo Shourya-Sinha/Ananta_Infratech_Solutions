@@ -6,7 +6,7 @@ import { colors, radius } from "@/theme";
 
 export function formatINR(n, { sign = false } = {}) {
   const abs = Math.abs(n ?? 0);
-  const body = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(abs);
+  const body = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(abs);
   if (!sign) return (n ?? 0) < 0 ? `−${body}` : body;
   return `${(n ?? 0) < 0 ? "−" : "+"}${body}`;
 }

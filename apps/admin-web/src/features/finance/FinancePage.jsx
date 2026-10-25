@@ -200,7 +200,7 @@ export function FinancePage() {
   const transactionColumns = [
     { header: "Date", cell: (t) => formatDate(t.date) },
     { header: "Category", cell: (t) => t.category.replace(/_/g, " "), className: "font-body" },
-    { header: "Amount", cell: (t) => formatINR(Math.round(t.amountPaise / 100)) },
+    { header: "Amount", cell: (t) => formatINR(t.amountPaise / 100) },
     { header: "Description", cell: (t) => (t.reversalOf ? "Reversal entry" : t.description ?? "—"), className: "font-body" },
     {
       header: "", cell: (t) => t.isWorkerPayout ? (
@@ -219,7 +219,7 @@ export function FinancePage() {
   const investmentColumns = [
     { header: "Date", cell: (i) => formatDate(i.date) },
     { header: "Type", cell: (i) => i.type.replace(/_/g, " "), className: "font-body" },
-    { header: "Amount", cell: (i) => formatINR(Math.round(i.amountPaise / 100)) },
+    { header: "Amount", cell: (i) => formatINR(i.amountPaise / 100) },
     { header: "Reference", cell: (i) => i.reference ?? "—", className: "font-body" },
     { header: "Note", cell: (i) => i.reversalOf ? "Reversal entry" : i.note ?? "—", className: "font-body" },
     {
@@ -246,7 +246,7 @@ export function FinancePage() {
     { header: "Date", cell: (e) => formatDate(e.date) },
     { header: "Category", cell: (e) => e.category.replace(/_/g, " "), className: "font-body" },
     { header: "Paid to", cell: (e) => e.paidTo ?? "—", className: "font-body" },
-    { header: "Amount", cell: (e) => formatINR(Math.round(e.amountPaise / 100)), className: "font-mono text-rust" },
+    { header: "Amount", cell: (e) => formatINR(e.amountPaise / 100), className: "font-mono text-rust" },
     { header: "Description", cell: (e) => e.reversalOf ? "Reversal entry" : (e.description ?? "—"), className: "font-body text-xs" },
     {
       header: "", cell: (e) => e.reversalOf || reversedCeIds.has(String(e._id)) ? (

@@ -9,7 +9,7 @@ import { colors, spacing } from "@/theme";
 const CATEGORIES = ["Food", "Transport", "Tools", "Medical", "Other"];
 
 function formatINR(n) {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
 export function RequestKharchiScreen() {
@@ -70,7 +70,7 @@ export function RequestKharchiScreen() {
       {kharchi?.map((k) =>
       <View key={k._id} style={styles.requestRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.requestAmount}>{formatINR(Math.round(k.amountPaise / 100))}</Text>
+            <Text style={styles.requestAmount}>{formatINR(k.amountPaise / 100)}</Text>
             <Text style={styles.requestReason}>
               {k.category} · {k.reason}
             </Text>

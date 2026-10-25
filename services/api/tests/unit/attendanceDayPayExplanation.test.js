@@ -2,8 +2,9 @@
 
 /*
  * Payroll must explain a short-hour PRESENT day: marked 6h at ₹750/day it
- * pays ₹562.50 (shown ₹563) and must display "6h" with the calculation —
- * not a bare "1P" that looks like a full paid day.
+ * pays exactly ₹562.50 (56250 paise — every paise shown and paid, never
+ * rounded to ₹563) and must display "6h" with the calculation — not a
+ * bare "1P" that looks like a full paid day.
  */
 const { describeAttendanceDay } = require("@ananta/utils");
 
@@ -15,8 +16,7 @@ describe("describeAttendanceDay (₹750/day = ₹93.75/hr)", () => {
     const d = at750({ status: "PRESENT", hoursWorked: 6, overtimeHours: 0 });
     expect(d.label).toBe("6h");
     expect(d.calculation).toBe("6h × ₹93.75/hr = ₹562.50");
-    expect(d.totalEarningPaise).toBe(562_50);
-    expect(Math.round(d.totalEarningPaise / 100)).toBe(563); // how Payroll rounds it
+    expect(d.totalEarningPaise).toBe(562_50); // exact paise — display must be ₹562.50, NOT ₹563
   });
 
   test.each([[1, 93_75], [2, 187_50], [4, 375_00]])("%sh day pays pro-rata", (hours, paise) => {

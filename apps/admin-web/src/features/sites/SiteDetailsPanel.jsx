@@ -45,7 +45,7 @@ export function SiteDetailsPanel({ site, managers = [], onClose }) {
       startDate: toInputDate(site.startDate),
       expectedCompletionDate: toInputDate(site.expectedCompletionDate),
       manager: site.manager?._id ?? (typeof site.manager === "string" ? site.manager : "") ?? "",
-      budgetRupees: site.budgetPaise != null ? String(Math.round(site.budgetPaise / 100)) : "",
+      budgetRupees: site.budgetPaise != null ? String(site.budgetPaise / 100) : "",
       description: site.description ?? "",
       status: site.status ?? "PLANNING",
     });
@@ -173,7 +173,7 @@ export function SiteDetailsPanel({ site, managers = [], onClose }) {
             <div>
               <dt className="text-xs uppercase tracking-wide text-graphite-500">Budget</dt>
               <dd className="font-mono font-medium text-graphite-900">
-                {site.budgetPaise != null ? formatINR(Math.round(site.budgetPaise / 100)) : "—"}
+                {site.budgetPaise != null ? formatINR(site.budgetPaise / 100) : "—"}
               </dd>
             </div>
             <div>
