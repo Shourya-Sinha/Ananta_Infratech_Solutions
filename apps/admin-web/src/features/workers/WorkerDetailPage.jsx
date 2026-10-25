@@ -20,6 +20,7 @@ import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
 import { DirectAdvancePanel, DirectKharchiPanel } from "@/features/requests/DirectAddPanels";
 import { WorkerDocumentsCard } from "./WorkerDocumentsCard";
 import { LiveSalaryCard } from "./LiveSalaryCard";
+import { SalaryRatePanel } from "./SalaryRatePanel";
 import { formatDate } from "@/lib/format";
 
 const STEPS = ["PENDING_VERIFICATION", "DOCUMENT_VERIFIED", "WORK_TYPE_VERIFIED", "ACTIVE"];
@@ -134,6 +135,7 @@ export function WorkerDetailPage() {
 
       <WorkerDocumentsCard workerId={worker._id} verificationStatus={worker.verificationStatus} />
 
+      <SalaryRatePanel workerId={worker._id} isSuperAdmin={isSuperAdmin} />
       <LiveSalaryCard workerId={worker._id} />
 
       {isSuperAdmin && (
@@ -208,8 +210,14 @@ export function WorkerDetailPage() {
             <dd className="font-medium text-graphite-900">{worker.workType?.name ?? "—"}</dd>
           </div>
           <div>
-            <dt className="text-graphite-500">Daily rate</dt>
-            <dd className="font-mono font-medium text-graphite-900">{worker.workType?.defaultDailyRatePaise != null ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(worker.workType.defaultDailyRatePaise / 100) + "/day" : "—"}</dd>
+            <dt className="text-graphite-500">Per-day wage</dt>
+            <dd className="font-mono font-medium text-graphite-900">
+              {worker.dailyRatePaise != null
+                ? <>{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(worker.dailyRatePaise / 100)}/day <span className="font-sans text-xs font-normal text-graphite-500">(agreed rate)</span></>
+                : worker.workType?.defaultDailyRatePaise != null
+                  ? <>{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(worker.workType.defaultDailyRatePaise / 100)}/day <span className="font-sans text-xs font-normal text-graphite-500">(work-type standard — set an agreed rate in Salary)</span></>
+                  : "—"}
+            </dd>
           </div>
           <div>
             <dt className="text-graphite-500">Registered</dt>

@@ -16,7 +16,23 @@ var _notification = require("../notifications/notification.service");
 var _argon2 = require("argon2");
 var _nodeCrypto = require("node:crypto");
 var _duplicatePolicy = require("./duplicatePolicy");
+var _utils = require("@ananta/utils");
 exports.WorkerService = {
+  /**
+   * Apply the admin-entered per-day wage to a profile (salaryMode=DAILY).
+   * No-op when the admin did not enter one — the work-type default then
+   * applies at salary time, exactly as before.
+   */
+  async applyDailyRate(profile, dailyRateRupees, actorId) {
+    if (dailyRateRupees === undefined || dailyRateRupees === null) return profile;
+    profile.salaryMode = "DAILY";
+    profile.dailyRatePaise = (0, _utils.rupeesToPaise)(dailyRateRupees);
+    profile.salaryRateUpdatedBy = actorId;
+    profile.salaryRateUpdatedAt = new Date();
+    await profile.save();
+    return profile;
+  },
+
   /**
    * Registration Step 2: select work type. Creates the WorkerProfile shell.
    * Called after Step 1 (User creation) + Step 3 (OTP verify) have already
@@ -219,6 +235,7 @@ exports.WorkerService = {
       if (!workType || !workType.isActive) throw _AppError.AppError.validation("Invalid or inactive work type.");
       profile.workType = workType._id;
       await profile.save();
+      await this.applyDailyRate(profile, input.dailyRateRupees, actorId);
     } else {
       profile = await this.selectWorkType({
         userId: user._id.toString(),
@@ -345,6 +362,7 @@ exports.WorkerService = {
       workTypeId: input.workTypeId,
       createdBy: actorId
     });
+    await this.applyDailyRate(profile, input.dailyRateRupees, actorId);
     if (input.siteId) {
       await this.assignSite({
         workerId: profile._id.toString(),

@@ -6,7 +6,7 @@ import { formatINR } from "@/lib/format";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/Toast";
 
-const EMPTY_FORM = { name: "", phone: "", email: "", workTypeId: "", siteId: "", password: "" };
+const EMPTY_FORM = { name: "", phone: "", email: "", workTypeId: "", dailyRate: "", siteId: "", password: "" };
 
 /**
  * Super Admin "Add worker" panel: one-shot worker registration from the
@@ -40,11 +40,21 @@ export function AddWorkerPanel() {
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
+  const selectedWorkType = workTypes?.find((wt) => wt.id === form.workTypeId);
+  // Work type = trade only (Mason, Foreman…). The money is a SEPARATE field:
+  // picking a type prefills its standard rate as a suggestion, and the admin
+  // overwrites it with the worker's actual agreed daily wage.
+  const onWorkTypeChange = (e) => {
+    const wt = workTypes?.find((w) => w.id === e.target.value);
+    setForm((f) => ({ ...f, workTypeId: e.target.value, dailyRate: wt ? String(wt.defaultDailyRate ?? "") : f.dailyRate }));
+  };
+
   const buildInput = (confirmDuplicate) => ({
     name: form.name.trim(),
     phone: form.phone.trim(),
     email: form.email.trim() || undefined,
     workTypeId: form.workTypeId,
+    dailyRateRupees: form.dailyRate === "" ? undefined : Number(form.dailyRate),
     siteId: form.siteId || undefined,
     password: form.password || undefined,
     confirmDuplicate: confirmDuplicate || undefined
@@ -52,7 +62,13 @@ export function AddWorkerPanel() {
 
   const doRegister = async (confirmDuplicate) => {
     const result = await register.mutateAsync(buildInput(confirmDuplicate));
-    setCreated({ ...result, name: form.name.trim(), phone: form.phone.trim() });
+    setCreated({
+      ...result,
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      workTypeName: selectedWorkType?.name ?? null,
+      dailyRate: form.dailyRate === "" ? null : Number(form.dailyRate)
+    });
     setForm(EMPTY_FORM);
     setDuplicate(null);
     if (result.updatedExisting) {
@@ -67,6 +83,10 @@ export function AddWorkerPanel() {
     setDuplicate(null);
     if (!form.name.trim() || !form.phone.trim() || !form.workTypeId) {
       setError("Full name, phone and work type are required.");
+      return;
+    }
+    if (form.dailyRate === "" || Number.isNaN(Number(form.dailyRate)) || Number(form.dailyRate) <= 0) {
+      setError("Enter the worker's per-day wage (₹/day) — the actual rate agreed with this worker.");
       return;
     }
     try {
@@ -142,6 +162,18 @@ export function AddWorkerPanel() {
             <dt className="text-graphite-500">Login phone</dt>
             <dd className="font-mono font-medium text-graphite-900">{created.phone}</dd>
           </div>
+          {created.workTypeName &&
+          <div className="flex justify-between gap-4">
+            <dt className="text-graphite-500">Work type</dt>
+            <dd className="font-medium text-graphite-900">{created.workTypeName}</dd>
+          </div>
+          }
+          {created.dailyRate != null &&
+          <div className="flex justify-between gap-4">
+            <dt className="text-graphite-500">Per-day wage</dt>
+            <dd className="font-medium text-graphite-900">{formatINR(created.dailyRate)}/day</dd>
+          </div>
+          }
           <div className="flex justify-between gap-4">
             <dt className="text-graphite-500">Password</dt>
             <dd className="font-mono font-medium text-graphite-900">{created.temporaryPassword}</dd>
@@ -190,93 +222,57 @@ export function AddWorkerPanel() {
           <label className="mb-1 block text-xs text-graphite-500">Email (optional)</label>
           <input className="input" type="email" value={form.email} onChange={set("email")} placeholder="worker@example.com" />
         </div>
-        {/* <div>
+        <div>
           <label className="mb-1 block text-xs text-graphite-500">Work type *</label>
-          <select className="input" value={form.workTypeId} onChange={set("workTypeId")}>
+          <select className="input" value={form.workTypeId} onChange={onWorkTypeChange}>
             <option value="">Select a work type…</option>
             {workTypes?.map((wt) => (
-              <option
-                key={wt.id}
-                value={wt.id}
-                disabled={!wt.isActive}
-              >
-                {wt.name} — {formatINR(wt.defaultDailyRate ?? 0)}/day
+              <option key={wt.id} value={wt.id} disabled={!wt.isActive}>
+                {wt.name}
               </option>
             ))}
           </select>
-        </div> */}
+          {workTypes && workTypes.length === 0 && (
+            <div className="mt-1 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-700">
+              No work types exist yet.{" "}
+              <button
+                type="button"
+                className="font-semibold underline"
+                disabled={seedWorkTypes.isPending}
+                onClick={() =>
+                  seedWorkTypes.mutate(undefined, {
+                    onSuccess: (r) => toast.success(`Loaded ${r.inserted} standard construction work types (Mason, Helper, Carpenter, Electrician…).`),
+                    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not load work types.")
+                  })
+                }
+              >
+                {seedWorkTypes.isPending ? "Loading…" : "Load standard construction work types"}
+              </button>{" "}
+              (Mason, Helper, Foreman, Carpenter, Electrician…) — or add your own in Work Types.
+            </div>
+          )}
+        </div>
         <div>
-  <label className="mb-1 block text-xs text-graphite-500">
-    Work type *
-  </label>
-
-  <select
-    className="input"
-    value={form.workTypeId}
-    onChange={set("workTypeId")}
-  >
-    <option value="">Select a work type…</option>
-
-    {workTypes?.map((wt) => (
-      <option
-        key={wt.id}
-        value={wt.id}
-        disabled={!wt.isActive}
-      >
-        {wt.name} — {formatINR(wt.defaultDailyRate ?? 0)}/day
-      </option>
-    ))}
-  </select>
-  {workTypes && workTypes.length === 0 && (
-    <div className="mt-1 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-700">
-      No work types exist yet.{" "}
-      <button
-        type="button"
-        className="font-semibold underline"
-        disabled={seedWorkTypes.isPending}
-        onClick={() =>
-          seedWorkTypes.mutate(undefined, {
-            onSuccess: (r) => toast.success(`Loaded ${r.inserted} standard construction work types (Mason, Helper, Carpenter, Electrician…).`),
-            onError: (err) => toast.error(err instanceof Error ? err.message : "Could not load work types.")
-          })
-        }
-      >
-        {seedWorkTypes.isPending ? "Loading…" : "Load standard construction work types"}
-      </button>{" "}
-      (Mason, Helper, Foreman, Carpenter, Electrician…) — or add your own in Work Types.
-    </div>
-  )}
-</div>
-        {/* <div>
-          <label className="mb-1 block text-xs text-graphite-500">
-            Work type *
-          </label>
-
-          <select
-            className="input"
-            value={form.workTypeId}
-            onChange={(e) =>
-              setForm((f) => ({
-                ...f,
-                workTypeId: e.target.value
-              }))
-            }
-          >
-            <option value="">Select a work type…</option>
-
-            {Array.isArray(workTypes) &&
-              workTypes.map((wt) => (
-                <option
-                  key={wt._id}
-                  value={wt._id}
-                  disabled={!wt.isActive}
-                >
-                  {wt.name} —{" "}
-                  {formatINR((wt.defaultDailyRatePaise ?? 0) / 100)}/day
-                </option>
-              ))}
-          </select>
-        </div> */}
+          <label className="mb-1 block text-xs text-graphite-500">Per-day wage (₹/day) *</label>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-graphite-500">₹</span>
+            <input
+              className="input pl-7"
+              type="number"
+              min="1"
+              step="any"
+              value={form.dailyRate}
+              onChange={set("dailyRate")}
+              placeholder="e.g. 750"
+            />
+          </div>
+          <p className="mt-1 text-xs text-graphite-500">
+            The actual amount this worker is paid per day.
+            {selectedWorkType
+              ? <> Standard rate for {selectedWorkType.name} is {formatINR(selectedWorkType.defaultDailyRate ?? 0)}/day — change it to the real agreed rate if different.</>
+              : " Selecting a work type pre-fills its standard rate — adjust to the real agreed rate."}
+          </p>
+        </div>
         <div>
           <label className="mb-1 block text-xs text-graphite-500">Site (optional)</label>
           <select className="input" value={form.siteId} onChange={set("siteId")}>
