@@ -34,8 +34,7 @@ export function WorkerHomeScreen() {
   const topNotice = announcements?.[0];
 
   const last7 = (pay?.daily ?? []).slice(0, 7).reverse().map((d) => ({
-    label: new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "narrow", timeZone: "UTC" }),
-    sub: String(Number(d.date.slice(8, 10))),
+    label: new Date(`${d.date}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }),
     value: d.netPaise / 100
   }));
   const last7Total = last7.reduce((s, d) => s + d.value, 0);
