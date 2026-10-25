@@ -20,6 +20,7 @@ import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
 import { DirectAdvancePanel, DirectKharchiPanel } from "@/features/requests/DirectAddPanels";
 import { WorkerDocumentsCard } from "./WorkerDocumentsCard";
 import { LiveSalaryCard } from "./LiveSalaryCard";
+import { SalaryRatePanel } from "./SalaryRatePanel";
 import { formatDate } from "@/lib/format";
 
 const STEPS = ["PENDING_VERIFICATION", "DOCUMENT_VERIFIED", "WORK_TYPE_VERIFIED", "ACTIVE"];
@@ -134,6 +135,7 @@ export function WorkerDetailPage() {
 
       <WorkerDocumentsCard workerId={worker._id} verificationStatus={worker.verificationStatus} />
 
+      <SalaryRatePanel workerId={worker._id} isSuperAdmin={isSuperAdmin} />
       <LiveSalaryCard workerId={worker._id} />
 
       {isSuperAdmin && (

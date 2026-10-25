@@ -208,3 +208,33 @@ export function useRegisterManager() {
     }
   });
 }
+
+/** Derived salary rates (₹/hour, ₹/day, ₹/month) + approximate monthly salary for a worker. */
+export function useSalaryPreview(workerId) {
+  return useQuery({
+    queryKey: ["salary", "preview", workerId],
+    queryFn: async () => unwrap(api.get(`/salary/worker/${workerId}/preview`)),
+    enabled: Boolean(workerId)
+  });
+}
+
+/**
+ * Edit a worker's pay rate later (Super Admin, salary.rate.manage).
+ * Admin sets ONE basis — here the per-day wage — and the API derives
+ * per-hour (÷ full-day hours) and monthly (× working days) from it.
+ * Only attendance posted AFTER the change uses the new rate; past salary
+ * ledger entries and paid payrolls are never rewritten.
+ */
+export function useSetSalaryRate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ workerId, mode, amountRupees }) =>
+      unwrap(api.put(`/salary/worker/${workerId}/salary-rate`, { mode, amountRupees })),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["salary", "preview", vars.workerId] });
+      qc.invalidateQueries({ queryKey: ["salary"] });
+      qc.invalidateQueries({ queryKey: ["workers"] });
+      qc.invalidateQueries({ queryKey: ["finance"] });
+    }
+  });
+}
