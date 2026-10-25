@@ -9,7 +9,7 @@ import { formatINR, formatDate } from "@/lib/format";
 import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
 
 function paise(v) {
-  return formatINR(Math.round(v / 100));
+  return formatINR(v / 100); // exact paise -> rupees, no rounding
 }
 
 function usePayrollMonth(month) {
@@ -128,7 +128,7 @@ export function PayrollPage() {
   };
   // Attendance summary in plain words + ACTUAL hours. A day marked PRESENT
   // for only 6 hours reads "1 Present · 6h worked" — never a bare "1P",
-  // which looked like a full day even though pay was pro-rated (₹563).
+  // which looked like a full day even though pay was pro-rated (₹562.50).
   const daysCell = (r) => {
     const parts = [];
     if (r.presentDays) parts.push(`${r.presentDays} Present`);
@@ -245,9 +245,9 @@ export function PayrollPage() {
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <KpiCard label="Workers" value={String(rows.length)} sublabel={siteFilter ? `${filtered.length} in selected site` : undefined} />
-        <KpiCard label="Gross + overtime" value={formatINR(Math.round((totals.gross + totals.overtime) / 100))} tone="positive" />
-        <KpiCard label="Total deductions" value={formatINR(Math.round(totals.deductions / 100))} tone="negative" sublabel="Advances + kharchi + other" />
-        <KpiCard label="Net payable" value={formatINR(Math.round(totals.net / 100))} sublabel="What workers are paid this month" />
+        <KpiCard label="Gross + overtime" value={formatINR((totals.gross + totals.overtime) / 100)} tone="positive" />
+        <KpiCard label="Total deductions" value={formatINR(totals.deductions / 100)} tone="negative" sublabel="Advances + kharchi + other" />
+        <KpiCard label="Net payable" value={formatINR(totals.net / 100)} sublabel="What workers are paid this month" />
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -376,7 +376,7 @@ export function PayrollPage() {
       <DataTable columns={columns} rows={filtered} isLoading={isLoading} emptyTitle="No payroll calculated yet" emptyBody={`Click "Calculate month" to generate payroll for ${month} from recorded attendance.`} />
 
       <p className="text-xs text-graphite-500">
-        How every amount is calculated: <strong>Gross</strong> = Σ daily earnings — each attendance day pays (hours worked ÷ full-day hours) × daily rate, so a day marked PRESENT for only 6 hours at ₹750/day pays 6h × ₹93.75/hr = ₹562.50 (shown as ₹563), not a full ₹750 — open <strong>Days &amp; ledger</strong> on any worker to see every day (AB, 1h, 2h, 6h, 8h full day, overtime) with its exact calculation. PRESENT with no hours recorded and LEAVE_PAID count as a full day, HALF_DAY is pro-rated from hours, ABSENT/LEAVE_UNPAID earn nothing. <strong>Overtime</strong> = hours beyond the overtime threshold × hourly rate × overtime multiplier. <strong>Net</strong> = Gross + Overtime − Advance − Kharchi − Other deductions. Corrections/deletions reverse the affected ledger entries first, so figures always match the underlying attendance.
+        How every amount is calculated: <strong>Gross</strong> = Σ daily earnings — each attendance day pays (hours worked ÷ full-day hours) × daily rate, so a day marked PRESENT for only 6 hours at ₹750/day pays 6h × ₹93.75/hr = ₹562.50 exactly, not a full ₹750 — open <strong>Days &amp; ledger</strong> on any worker to see every day (AB, 1h, 2h, 6h, 8h full day, overtime) with its exact calculation. PRESENT with no hours recorded and LEAVE_PAID count as a full day, HALF_DAY is pro-rated from hours, ABSENT/LEAVE_UNPAID earn nothing. <strong>Overtime</strong> = hours beyond the overtime threshold × hourly rate × overtime multiplier. <strong>Net</strong> = Gross + Overtime − Advance − Kharchi − Other deductions. Corrections/deletions reverse the affected ledger entries first, so figures always match the underlying attendance.
       </p>
 
       <div className="card p-4">
@@ -429,7 +429,7 @@ export function PayrollPage() {
                 ))}
               </ul>
             )}
-            <p className="border-t border-steel-100 px-3 py-2 text-[11px] text-graphite-400">Day pay is before that day&apos;s advance/Kharchi deductions — see the ledger below for debits and the running balance. Example: a 6h day at ₹750/day (₹93.75/hr) pays 6 × ₹93.75 = ₹562.50, shown rounded as ₹563.</p>
+            <p className="border-t border-steel-100 px-3 py-2 text-[11px] text-graphite-400">Day pay is before that day&apos;s advance/Kharchi deductions — see the ledger below for debits and the running balance. Example: a 6h day at ₹750/day (₹93.75/hr) pays 6 × ₹93.75 = ₹562.50 exactly — every paise is shown and paid, nothing is rounded to the nearest rupee.</p>
           </div>
         )}
         {ledgerWorker ? (

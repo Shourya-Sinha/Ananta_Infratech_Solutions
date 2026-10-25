@@ -84,7 +84,7 @@ export function MaterialsPage() {
     { header: "Category", cell: (m) => m.category ?? "—" },
     { header: "Stock", cell: (m) => <span className={cx("font-mono", Number(m.currentStock) <= Number(m.reorderLevel) ? "text-rust" : "")}>{m.currentStock} {m.unit}</span> },
     { header: "Reorder at", cell: (m) => `${m.reorderLevel ?? 0} ${m.unit}` },
-    { header: "Last rate", cell: (m) => m.lastPurchaseRatePaise ? formatINR(Math.round(m.lastPurchaseRatePaise / 100)) : "—" },
+    { header: "Last rate", cell: (m) => m.lastPurchaseRatePaise ? formatINR(m.lastPurchaseRatePaise / 100) : "—" },
     { header: "Supplier", cell: (m) => m.supplier?.name ?? "—" },
     {
       header: "", cell: (m) => (

@@ -11,7 +11,7 @@ import { formatINR, formatDate } from "@/lib/format";
 import { useSocketInvalidate } from "@/hooks/useSocketInvalidate";
 import { DirectAdvancePanel, DirectKharchiPanel } from "./DirectAddPanels";
 
-const toRupees = (paise) => Math.round(paise / 100);
+const toRupees = (paise) => paise / 100; // exact: 56250 paise -> ₹562.50, never rounded to ₹563
 
 export function RequestsPage() {
   const [tab, setTab] = useState("advances");

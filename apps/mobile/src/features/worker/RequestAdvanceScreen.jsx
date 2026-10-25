@@ -7,7 +7,7 @@ import { currentMonthKey, toRupeeView } from "@/lib/salaryDisplay";
 import { colors, spacing } from "@/theme";
 
 function formatINR(n) {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
 export function RequestAdvanceScreen() {
@@ -56,7 +56,7 @@ export function RequestAdvanceScreen() {
       {advances?.map((a) =>
       <View key={a._id} style={styles.requestRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.requestAmount}>{formatINR(Math.round(a.amountPaise / 100))}</Text>
+            <Text style={styles.requestAmount}>{formatINR(a.amountPaise / 100)}</Text>
             <Text style={styles.requestReason}>{a.reason}</Text>
           </View>
           <Badge label={a.status} tone={a.status === "APPROVED" || a.status === "PAID" ? "positive" : a.status === "REJECTED" ? "negative" : "amber"} />

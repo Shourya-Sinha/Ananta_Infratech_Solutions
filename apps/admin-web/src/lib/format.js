@@ -1,8 +1,11 @@
 export function formatINR(amountRupees) {
+  // Every paise matters: always show exactly 2 decimals (₹93.75,
+  // ₹562.50) — never round a display amount to the nearest rupee.
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
-    maximumFractionDigits: 0
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   }).format(amountRupees);
 }
 
