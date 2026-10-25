@@ -65,6 +65,13 @@ const monthlyPayrollSchema = new _mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Actual worked hours (hoursWorked + overtime) behind the day counts, so
+  // Payroll can show "1 Present day · 6h worked" instead of a bare "1P"
+  // when a PRESENT day was marked for fewer than the full-day hours.
+  totalHoursWorked: {
+    type: Number,
+    default: 0
+  },
   status: {
     type: String,
     enum: _sharedTypes.PAYROLL_STATUS,

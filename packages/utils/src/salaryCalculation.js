@@ -6,6 +6,7 @@ exports.calculateNetSalary = calculateNetSalary;
 exports.deriveSalaryRates = deriveSalaryRates;
 exports.expectedMonthlyGrossPaise = expectedMonthlyGrossPaise;
 exports.projectMonthlySalary = projectMonthlySalary;
+exports.describeAttendanceDay = describeAttendanceDay;
 exports.getSalaryPeriodSchedule = getSalaryPeriodSchedule;
 Object.defineProperty(exports, "multiplyPaiseByFactor", {
   enumerable: true,
@@ -151,6 +152,97 @@ function getSalaryPeriodSchedule(input = {}) {
     elapsedDays,
     remainingDays: Math.max(0, dates.length - elapsedDays),
     today
+  };
+}
+
+/** Format an hour count without float noise: 6 -> "6", 6.5 -> "6.5". */
+function fmtHours(value) {
+  const rounded = Math.round((Number(value) || 0) * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+}
+
+/**
+ * Explain ONE attendance day in payroll terms — the single source used by
+ * the Payroll day-by-day breakdown (and shared with salary previews):
+ * what was marked, how many paid hours that means, and exactly how the
+ * payable amount was calculated from the worker's per-day wage.
+ *
+ * Mirrors SalaryService.postDailyEarning semantics exactly:
+ *  - ABSENT / LEAVE_UNPAID earn nothing ("AB" / unpaid leave).
+ *  - LEAVE_PAID is a full paid day.
+ *  - PRESENT with no hours recorded = full day; HALF_DAY with no hours =
+ *    half a day (managers often just tap the status).
+ *  - Otherwise hoursWorked + overtimeHours are paid pro-rata; hours beyond
+ *    the overtime threshold earn the overtime multiplier.
+ * Example at ₹750/day (₹93.75/hr): a 6h day -> label "6h",
+ * calculation "6h × ₹93.75/hr = ₹562.50", payable 56250 paise (shown ₹563).
+ */
+function describeAttendanceDay(input = {}) {
+  const rules = input.rules || {};
+  const fullDayHours = Number(rules.fullDayHours) > 0 ? Number(rules.fullDayHours) : 8;
+  const normalizedRules = {
+    fullDayHours,
+    overtimeStartHours: Number(rules.overtimeStartHours) > 0 ? Number(rules.overtimeStartHours) : fullDayHours,
+    overtimeMultiplier: Number(rules.overtimeMultiplier) > 0 ? Number(rules.overtimeMultiplier) : 1,
+    workingDaysPerMonth: Number(rules.workingDaysPerMonth) > 0 ? Number(rules.workingDaysPerMonth) : 26
+  };
+  const status = String(input.status || "PRESENT").toUpperCase();
+  const dailyRatePaise = Math.max(0, Math.round(Number(input.dailyRatePaise) || 0));
+  const hourlyRatePaise = fullDayHours > 0 ? Math.round(dailyRatePaise / fullDayHours) : 0;
+
+  if (status === "ABSENT" || status === "LEAVE_UNPAID") {
+    return {
+      status,
+      label: status === "ABSENT" ? "AB" : "Unpaid leave",
+      detailLabel: status === "ABSENT" ? "Absent (AB)" : "Unpaid leave (UL)",
+      paidHours: 0,
+      regularHours: 0,
+      overtimeHours: 0,
+      hourlyRatePaise,
+      dailyRatePaise,
+      regularEarningPaise: 0,
+      overtimeEarningPaise: 0,
+      totalEarningPaise: 0,
+      calculation: status === "ABSENT" ? "Absent — no work, no pay for this day" : "Unpaid leave — no pay for this day"
+    };
+  }
+
+  let paidHours = (Number(input.hoursWorked) || 0) + (Number(input.overtimeHours) || 0);
+  if (status === "LEAVE_PAID") paidHours = fullDayHours;
+  else if (paidHours === 0 && status === "PRESENT") paidHours = fullDayHours;
+  else if (paidHours === 0 && status === "HALF_DAY") paidHours = fullDayHours / 2;
+
+  const calc = calculateDailyEarning({ dailyRatePaise, hoursWorked: paidHours, rules: normalizedRules });
+  let label;
+  if (status === "LEAVE_PAID") label = `PL · ${fmtHours(paidHours)}h full day`;
+  else if (status === "HALF_DAY" && calc.overtimeHours === 0) label = `Half day · ${fmtHours(paidHours)}h`;
+  else if (calc.overtimeHours > 0) label = `${fmtHours(calc.regularHours)}h + ${fmtHours(calc.overtimeHours)}h OT`;
+  else if (paidHours >= fullDayHours) label = `${fmtHours(paidHours)}h · Full day`;
+  else label = `${fmtHours(paidHours)}h`;
+
+  let calculation = `${fmtHours(calc.regularHours)}h × ${(0, _money.formatINR)(calc.hourlyRatePaise)}/hr`;
+  if (calc.overtimeHours > 0) {
+    calculation += ` + ${fmtHours(calc.overtimeHours)}h OT × ${(0, _money.formatINR)(calc.hourlyRatePaise)}/hr × ${normalizedRules.overtimeMultiplier}`;
+  }
+  calculation += ` = ${(0, _money.formatINR)(calc.totalEarningPaise)}`;
+  if (status === "LEAVE_PAID") calculation = `Paid leave — full day ${fmtHours(fullDayHours)}h × ${(0, _money.formatINR)(calc.hourlyRatePaise)}/hr = ${(0, _money.formatINR)(calc.totalEarningPaise)}`;
+  else if (status === "HALF_DAY" && (Number(input.hoursWorked) || 0) === 0 && (Number(input.overtimeHours) || 0) === 0) {
+    calculation = `Half day — ${fmtHours(paidHours)}h × ${(0, _money.formatINR)(calc.hourlyRatePaise)}/hr = ${(0, _money.formatINR)(calc.totalEarningPaise)}`;
+  }
+
+  return {
+    status,
+    label,
+    detailLabel: label,
+    paidHours,
+    regularHours: calc.regularHours,
+    overtimeHours: calc.overtimeHours,
+    hourlyRatePaise: calc.hourlyRatePaise,
+    dailyRatePaise,
+    regularEarningPaise: calc.regularEarningPaise,
+    overtimeEarningPaise: calc.overtimeEarningPaise,
+    totalEarningPaise: calc.totalEarningPaise,
+    calculation
   };
 }
 

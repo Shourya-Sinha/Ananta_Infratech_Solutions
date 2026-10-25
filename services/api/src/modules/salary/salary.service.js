@@ -183,6 +183,9 @@ exports.SalaryService = {
         },
         overtimeHours: {
           $sum: "$overtimeHours"
+        },
+        hoursWorked: {
+          $sum: "$hoursWorked"
         }
       }
     }]);
@@ -194,12 +197,16 @@ exports.SalaryService = {
       absentDays: 0,
       customDays: 0,
       markedDays: 0,
-      overtimeHours: 0
+      overtimeHours: 0,
+      hoursWorked: 0,
+      totalHoursWorked: 0
     };
     for (const row of counts) {
       summary.markedDays += row.count;
       // hours can be fractional (e.g. 1.5) — round to one decimal, never float-drift
       summary.overtimeHours = Math.round((summary.overtimeHours + (row.overtimeHours ?? 0)) * 10) / 10;
+      summary.hoursWorked = Math.round((summary.hoursWorked + (row.hoursWorked ?? 0)) * 10) / 10;
+      summary.totalHoursWorked = Math.round((summary.hoursWorked + summary.overtimeHours) * 10) / 10;
       switch (row._id) {
         case "PRESENT":
           summary.presentDays += row.count;
@@ -459,7 +466,7 @@ exports.SalaryService = {
     }).select("amountPaise")]);
     const pendingAdvancePaise = advances.reduce((sum, a) => sum + (a.approvedAmountPaise ?? toPaiseNumber(a.amountPaise)), 0);
     const pendingKharchiPaise = kharchi.reduce((sum, k) => sum + toPaiseNumber(k.amountPaise), 0);
-    return (0, _statement.buildStatement)({
+    const statement = (0, _statement.buildStatement)({
       month,
       entries,
       attendance,
@@ -467,6 +474,55 @@ exports.SalaryService = {
       pendingKharchiPaise,
       payrollStatus: payroll?.status ?? null
     });
+    // Per-day attendance + "how was today's pay calculated" for the Payroll
+    // and Worker pages: a day marked PRESENT for only 6 hours must show
+    // "6h — 6h × ₹93.75/hr = ₹562.50" and NOT just "1P" (status count),
+    // while ABSENT shows "AB — no pay". Latest record per date wins so a
+    // correction replaces the original day's explanation.
+    const profile = await _WorkerProfile.WorkerProfile.findById(workerId).populate("workType");
+    if (profile) {
+      const rules = await _salaryRule.SalaryRuleService.getActiveRuleSet();
+      const rates = (0, _utils.deriveSalaryRates)({
+        salaryMode: profile.salaryMode,
+        hourlyRatePaise: profile.hourlyRatePaise,
+        dailyRatePaise: profile.dailyRatePaise,
+        monthlySalaryPaise: profile.monthlySalaryPaise,
+        fallbackDailyRatePaise: profile.workType?.defaultDailyRatePaise
+      }, rules);
+      const attendanceRows = await _Attendance.Attendance.find({
+        worker: workerId,
+        date: {
+          $gte: from,
+          $lte: to
+        }
+      }).sort({
+        date: 1,
+        createdAt: 1
+      });
+      const latestByDate = new Map();
+      for (const row of attendanceRows) latestByDate.set(row.date.toISOString().slice(0, 10), row);
+      statement.salaryRates = {
+        dailyRatePaise: rates.dailyRatePaise,
+        hourlyRatePaise: rates.hourlyRatePaise,
+        fullDayHours: rates.fullDayHours,
+        source: rates.source
+      };
+      statement.dailyAttendance = [...latestByDate.entries()].map(([date, row]) => ({
+        date,
+        status: row.status,
+        hoursWorked: row.hoursWorked ?? 0,
+        overtimeHours: row.overtimeHours ?? 0,
+        site: row.site?.toString() ?? null,
+        ...(0, _utils.describeAttendanceDay)({
+          status: row.status,
+          hoursWorked: row.hoursWorked,
+          overtimeHours: row.overtimeHours,
+          dailyRatePaise: rates.dailyRatePaise,
+          rules
+        })
+      })).sort((a, b) => b.date.localeCompare(a.date));
+    }
+    return statement;
   },
   /**
    * Recomputes (idempotently — safe to re-run) the monthly rollup from raw
@@ -563,6 +619,7 @@ exports.SalaryService = {
       unpaidLeaveDays: attendance.unpaidLeaveDays,
       absentDays: attendance.absentDays,
       overtimeHours: attendance.overtimeHours,
+      totalHoursWorked: attendance.totalHoursWorked ?? 0,
       status: "CALCULATED"
     }, {
       upsert: true,
