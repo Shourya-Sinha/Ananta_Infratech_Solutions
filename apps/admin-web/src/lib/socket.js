@@ -1,5 +1,6 @@
 import { io } from "socket.io-client";
 import { useAuthStore } from "@/stores/authStore";
+import { APP_VERSION } from "@/lib/version";
 
 let socket = null;
 
@@ -8,7 +9,7 @@ export function getSocket() {
 
   socket = io("/", {
     path: "/socket.io",
-    auth: { token: useAuthStore.getState().accessToken },
+    auth: { token: useAuthStore.getState().accessToken, client: "admin-web", version: APP_VERSION },
     autoConnect: true,
     reconnection: true
   });

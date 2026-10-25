@@ -2,11 +2,13 @@
   "expo": {
     "name": "Ananta Infratech",
     "slug": "ananta-infratech-mobile",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "ananta",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.anantainfratech.mobile",
@@ -17,7 +19,11 @@
     },
     "android": {
       "package": "com.anantainfratech.mobile",
-      "permissions": ["CAMERA", "READ_MEDIA_IMAGES", "POST_NOTIFICATIONS"]
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "plugins": [
       [

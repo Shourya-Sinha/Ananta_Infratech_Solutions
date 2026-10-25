@@ -1,3 +1,14 @@
+var _version = require("./version");
+Object.keys(_version).forEach(function (key) {
+  if (key === "default" || key === "__esModule") return;
+  if (key in exports && exports[key] === _version[key]) return;
+  Object.defineProperty(exports, key, {
+    enumerable: true,
+    get: function () {
+      return _version[key];
+    }
+  });
+});
 Object.defineProperty(exports, "__esModule", {
   value: true
 });

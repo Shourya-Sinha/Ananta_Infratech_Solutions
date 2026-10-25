@@ -1,6 +1,7 @@
 import { io } from "socket.io-client";
 import { API_BASE_URL } from "@/lib/apiClient";
 import { useAuthStore } from "@/stores/authStore";
+import { APP_VERSION } from "@/lib/version";
 
 let socket = null;
 
@@ -10,7 +11,7 @@ export function getSocket() {
   const origin = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
   socket = io(origin, {
     path: "/socket.io",
-    auth: { token: useAuthStore.getState().accessToken },
+    auth: { token: useAuthStore.getState().accessToken, client: "mobile", version: APP_VERSION },
     autoConnect: true,
     reconnection: true
   });
