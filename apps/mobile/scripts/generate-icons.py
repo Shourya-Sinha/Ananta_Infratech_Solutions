@@ -69,9 +69,20 @@ def brand_placeholder(size):
 
 def load_source(size):
     if os.path.exists(LOGO):
+        # LOGO.png has a transparent background with dark-blue artwork, so
+        # it sits on a clean white tile (navy would swallow the artwork).
         src = Image.open(LOGO).convert("RGBA")
-        tile = Image.new("RGBA", (size, size), NAVY)
-        src.thumbnail((int(size * 0.82), int(size * 0.82)), Image.LANCZOS)
+        # LOGO.png carries wide transparent margins — crop to the artwork
+        # first or the icon looks tiny in the middle of the tile.
+        bbox = src.getchannel("A").getbbox()
+        if bbox:
+            src = src.crop(bbox)
+        tile = Image.new("RGBA", (size, size), (255, 255, 255, 255))
+        # NOTE: resize, not thumbnail — thumbnail never upscales, and
+        # LOGO.png is only ~143px while the icon master is 1024px.
+        target = int(size * 0.86)
+        scale = target / max(src.width, src.height)
+        src = src.resize((max(1, round(src.width * scale)), max(1, round(src.height * scale))), Image.LANCZOS)
         tile.alpha_composite(src, ((size - src.width) // 2, (size - src.height) // 2))
         return tile
     return brand_placeholder(size)

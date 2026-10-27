@@ -151,18 +151,16 @@ chat · Permission Management
 (app-wide toast stack — every mutating action surfaces a success toast or
 the server's exact error message, auto-dismissing, with title/body/close)
 
-### Mobile app (Expo, Manager + Worker) — modern animated design
+### Mobile app (pure React Native, Manager + Worker) — modern animated design
 
-Real Expo managed workflow — not bare React Native. The mobile app went
-Expo → bare React Native CLI → back to Expo over the course of this
-project (each direction was a genuine, verified conversion, not a relabel
-— see git-free history in this README for what each pass actually
-changed). One JS app, role-routed after login.
+Pure React Native CLI 0.74.5 (migrated off Expo — see "Mobile: pure React
+Native" below for the full module-by-module mapping). One JS app,
+role-routed after login.
 
-**Design**: gradient backdrops (`expo-linear-gradient`) on auth screens,
+**Design**: gradient backdrops (`react-native-linear-gradient`) on auth screens,
 a shared animated component library (`src/components/ui.jsx`) used across
 every screen — buttons press with a spring "squish" plus haptic feedback
-(`expo-haptics`), cards rise and fade into place (`react-native-reanimated`
+(`react-native-haptic-feedback`), cards rise and fade into place (`react-native-reanimated`
 `FadeInDown`), pending-status badges pulse gently, loading states use a
 shimmering skeleton instead of a bare spinner, and screen transitions use
 Reanimated's `entering`/`exiting` animations (`SlideInDown`/`SlideOutUp`
@@ -539,7 +537,7 @@ Display rounding previously hid paise: the Payroll rate header showed **₹94/hr
 
 API, Admin Web and Mobile are locked to **one release version** (`RELEASE_VERSION` in `packages/constants/src/version.js`, currently **1.1.0**; `npm run version:check` — part of `npm run verify` — fails if `app.json`/package versions drift). Every official client sends `x-client` + `x-app-version` on every API request (and socket handshake). On any mismatch the API rejects with **HTTP 426 `FORCE_UPDATE`** (public `GET /api/v1/system/version` stays reachable so old clients can learn the required version). Clients respond with a **strict, non-dismissible popup**: mobile shows "Update required → Update the app" (store link from `MOBILE_UPDATE_URL`), Admin Web shows "Admin panel update required → Refresh now" (hard reload to the new bundle). Admin also checks on load/focus and on every response's `x-release-version` header, mobile checks on start/foreground — so a deploy instantly locks outdated tabs/apps until they match. **Release process:** bump the versions together → deploy API + Admin Web → publish the mobile build.
 
-> **Mobile icon crash fixed:** `TypeError: _ExpoFontLoader...getLoadedFonts is not a function` (in any `Icon`/`Ionicons` on any screen) was caused by npm hoisting **expo-font 57** (incompatible with Expo SDK 51) for `@expo/vector-icons`. The repo now pins `expo-font ~12.0.10` in `apps/mobile/package.json` **and** a root npm `overrides` entry, so a fresh `npm install` resolves exactly one SDK-51 copy. If you see it on an old checkout: pull, delete `node_modules` + `package-lock.json` changes, `npm install`, restart Metro with `npx expo start -c`.
+> **Historical note (pre-migration):** the old Expo build once crashed with `_ExpoFontLoader...getLoadedFonts is not a function` due to an expo-font version mismatch. That entire class of issue is gone with the pure React Native migration — icons now come from `react-native-vector-icons` with the font bundled in the native project. If Metro ever serves a stale bundle, restart it with `npx react-native start --reset-cache` from `apps/mobile`.
 
 
 ## Mobile: pure React Native (Expo fully removed)
@@ -595,10 +593,13 @@ app runs fine without it until then. Also set
 
 **App icon (rounded):** generated into `android/app/src/main/res` (legacy
 rounded mipmaps + adaptive icon) by `apps/mobile/scripts/generate-icons.py`.
-It uses **`LOGO.png` at the repository root** when present — add your real
-logo there and re-run `python3 apps/mobile/scripts/generate-icons.py`
-(pip `pillow` required); until then a brand placeholder (gold roof/A on
-navy) is generated.
+It uses **`LOGO.png` at the repository root** (your crane/buildings logo,
+committed) — the script crops its transparent margins and upscales it onto
+a white rounded tile. Replace LOGO.png and re-run
+`python3 apps/mobile/scripts/generate-icons.py` (pip `pillow` required)
+to regenerate; without LOGO.png a brand placeholder (gold roof/A on navy)
+is generated instead. The source is only ~143px, so a higher-resolution
+LOGO.png will make the launcher icon sharper.
 
 **Release/version bump:** bump `@ananta/constants` + the package versions
 as usual (`npm run version:check`), plus `versionName`/`versionCode` in
