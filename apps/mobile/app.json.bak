@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Ananta Infratech",
+    "slug": "ananta-infratech-mobile",
+    "version": "1.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "ananta",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.anantainfratech.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Ananta Infratech needs camera access so you can photograph identity documents and your profile photo.",
+        "NSPhotoLibraryUsageDescription": "Ananta Infratech needs photo library access so you can upload identity documents and your profile photo.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.anantainfratech.mobile",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ananta Infratech needs photo library access so you can upload identity documents.",
+          "cameraPermission": "Ananta Infratech needs camera access so you can photograph identity documents."
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "extra": {
+      "apiBaseUrl": "http://192.168.1.4:4000/api/v1",
+      "eas": {
+        "projectId": "e277353e-f74a-4845-985c-77213fd54c3e"
+      }
+    }
+  }
+}

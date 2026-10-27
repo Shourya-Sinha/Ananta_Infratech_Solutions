@@ -1,4 +1,4 @@
-const path = require("path");
+﻿const path = require("path");
 const { getDefaultConfig } = require("expo/metro-config");
 
 // Monorepo-aware config: this app lives in apps/mobile inside an npm
@@ -10,16 +10,16 @@ const srcRoot = path.resolve(projectRoot, "src");
 
 const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [workspaceRoot];
+config.watchFolders = [...new Set([...(config.watchFolders || []), workspaceRoot])];
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, "node_modules"),
   path.resolve(workspaceRoot, "node_modules"),
 ];
 
 // The "@/..." alias used throughout src/ needs Metro's own resolveRequest
-// hook — Metro's dependency graph reads raw import strings via a
+// hook â€” Metro's dependency graph reads raw import strings via a
 // lightweight static scan before any Babel plugin runs, so a babel alias
-// plugin alone can't make this resolve (verified the hard way — see README).
+// plugin alone can't make this resolve (verified the hard way â€” see README).
 const defaultResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName.startsWith("@/")) {
@@ -31,3 +31,4 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 };
 
 module.exports = config;
+
