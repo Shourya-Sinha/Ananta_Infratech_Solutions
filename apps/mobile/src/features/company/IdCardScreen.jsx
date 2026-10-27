@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import LinearGradient from "react-native-linear-gradient";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { ScreenHeader } from "@/components/ui";
 import { Avatar } from "@/components/design";
 import { useMyProfile } from "@/features/worker/api";

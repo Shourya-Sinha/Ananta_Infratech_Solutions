@@ -1,6 +1,6 @@
 import { View, Text, FlatList, StyleSheet, TextInput, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { Avatar } from "@/components/design";
 import { formatINR } from "@/components/interactive";
 import { BrandFooter } from "@/components/BrandFooter";

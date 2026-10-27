@@ -12,9 +12,10 @@ Plain JavaScript everywhere — **no TypeScript, no YAML, no pnpm**.
 - **Backend** (`services/api`): Node.js + Express, plain CommonJS `.js`
   files, MongoDB/Mongoose, Redis, Socket.IO
 - **Admin Web** (`apps/admin-web`): React 18 + Vite, plain `.jsx`, Tailwind CSS
-- **Mobile** (`apps/mobile`): **Expo (managed workflow)**, plain `.jsx`,
-  React Native Reanimated for real animations, no native `android/`/`ios/`
-  project folders needed for development
+- **Mobile** (`apps/mobile`): **pure React Native CLI 0.74.5** (no Expo —
+  fully migrated, see "Mobile: pure React Native" below), plain `.jsx`,
+  React Native Reanimated for real animations, committed native
+  `android/` + `ios/` projects
 - **Shared packages** (`packages/*`): plain `.js`, consumed by all three
   apps via npm workspace symlinks
 - **No CI/CD YAML**: instead, `npm run verify` at the repo root runs lint +
@@ -150,18 +151,16 @@ chat · Permission Management
 (app-wide toast stack — every mutating action surfaces a success toast or
 the server's exact error message, auto-dismissing, with title/body/close)
 
-### Mobile app (Expo, Manager + Worker) — modern animated design
+### Mobile app (pure React Native, Manager + Worker) — modern animated design
 
-Real Expo managed workflow — not bare React Native. The mobile app went
-Expo → bare React Native CLI → back to Expo over the course of this
-project (each direction was a genuine, verified conversion, not a relabel
-— see git-free history in this README for what each pass actually
-changed). One JS app, role-routed after login.
+Pure React Native CLI 0.74.5 (migrated off Expo — see "Mobile: pure React
+Native" below for the full module-by-module mapping). One JS app,
+role-routed after login.
 
-**Design**: gradient backdrops (`expo-linear-gradient`) on auth screens,
+**Design**: gradient backdrops (`react-native-linear-gradient`) on auth screens,
 a shared animated component library (`src/components/ui.jsx`) used across
 every screen — buttons press with a spring "squish" plus haptic feedback
-(`expo-haptics`), cards rise and fade into place (`react-native-reanimated`
+(`react-native-haptic-feedback`), cards rise and fade into place (`react-native-reanimated`
 `FadeInDown`), pending-status badges pulse gently, loading states use a
 shimmering skeleton instead of a bare spinner, and screen transitions use
 Reanimated's `entering`/`exiting` animations (`SlideInDown`/`SlideOutUp`
@@ -306,8 +305,8 @@ sh infra/docker/start-dev-services.sh   # starts MongoDB + Redis via plain docke
 #   from that script directly (one for mongo:7, one for redis:7-alpine).
 npm run seed                # one-time: roles, permissions, super admin (safe to re-run)
 npm run dev                 # starts API + admin web together (see below for separate)
-# mobile app (Expo — scan the QR code with Expo Go, or press 'a'/'i' for an
-# emulator/simulator if you have Android Studio/Xcode installed):
+# mobile app (pure React Native — needs Android Studio/emulator or a USB
+# device; starts Metro only):
 npm run dev:mobile
 ```
 
@@ -319,9 +318,9 @@ API listens on `http://localhost:4000`. Health check: `GET /health`
 (public status for the admin banner: `GET /api/v1/status`).
 API docs: `http://localhost:4000/api/v1/docs`.
 Admin web app: `http://localhost:5173` (proxies `/api` and `/socket.io` to the API).
-Mobile app: set `extra.apiBaseUrl` in `apps/mobile/app.json` to your
-machine's LAN IP (not `localhost`) if testing on a physical device or
-most emulators.
+Mobile app: set `API_BASE_URL` in `apps/mobile/src/config.js` — your
+machine's LAN IP (not `localhost`) on a physical device, `10.0.2.2` on
+the Android emulator, or your deployed/tunnel URL.
 
 ### Troubleshooting
 
@@ -538,4 +537,70 @@ Display rounding previously hid paise: the Payroll rate header showed **₹94/hr
 
 API, Admin Web and Mobile are locked to **one release version** (`RELEASE_VERSION` in `packages/constants/src/version.js`, currently **1.1.0**; `npm run version:check` — part of `npm run verify` — fails if `app.json`/package versions drift). Every official client sends `x-client` + `x-app-version` on every API request (and socket handshake). On any mismatch the API rejects with **HTTP 426 `FORCE_UPDATE`** (public `GET /api/v1/system/version` stays reachable so old clients can learn the required version). Clients respond with a **strict, non-dismissible popup**: mobile shows "Update required → Update the app" (store link from `MOBILE_UPDATE_URL`), Admin Web shows "Admin panel update required → Refresh now" (hard reload to the new bundle). Admin also checks on load/focus and on every response's `x-release-version` header, mobile checks on start/foreground — so a deploy instantly locks outdated tabs/apps until they match. **Release process:** bump the versions together → deploy API + Admin Web → publish the mobile build.
 
-> **Mobile icon crash fixed:** `TypeError: _ExpoFontLoader...getLoadedFonts is not a function` (in any `Icon`/`Ionicons` on any screen) was caused by npm hoisting **expo-font 57** (incompatible with Expo SDK 51) for `@expo/vector-icons`. The repo now pins `expo-font ~12.0.10` in `apps/mobile/package.json` **and** a root npm `overrides` entry, so a fresh `npm install` resolves exactly one SDK-51 copy. If you see it on an old checkout: pull, delete `node_modules` + `package-lock.json` changes, `npm install`, restart Metro with `npx expo start -c`.
+> **Historical note (pre-migration):** the old Expo build once crashed with `_ExpoFontLoader...getLoadedFonts is not a function` due to an expo-font version mismatch. That entire class of issue is gone with the pure React Native migration — icons now come from `react-native-vector-icons` with the font bundled in the native project. If Metro ever serves a stale bundle, restart it with `npx react-native start --reset-cache` from `apps/mobile`.
+
+
+## Mobile: pure React Native (Expo fully removed)
+
+The mobile app was migrated from Expo (managed) to the **pure React Native
+CLI** on the RN version it already used — **React Native 0.74.5 + React
+18.2.0** — so no library had to change version: navigation 6.x, Reanimated
+3.10.1, screens 3.31.1, safe-area-context 4.10.5 were all already bare-RN
+compatible. Every screen, feature and the backend are unchanged.
+
+**What replaced what**
+
+| Expo (removed) | Pure React Native |
+| --- | --- |
+| `expo` / Expo Go / EAS (`eas.json`, root `app.json`/`android/` strays deleted; 130+ Expo packages pruned) | React Native CLI + committed `apps/mobile/android` & `ios` (template 0.74.5) |
+| `@expo/vector-icons` | `react-native-vector-icons` (same Ionicons; font in `android/app/src/main/assets/fonts`) |
+| `expo-linear-gradient` | `react-native-linear-gradient` |
+| `expo-haptics` | `react-native-haptic-feedback` (same call sites via `src/lib/haptics.js`) |
+| `expo-image-picker` | `react-native-image-picker` |
+| `expo-secure-store` | `react-native-keychain` (Keychain/Keystore, same `SecureTokenStore` API) |
+| `expo-constants` | `apps/mobile/src/config.js` (`API_BASE_URL`, `APP_VERSION` from `@ananta/constants`) |
+| `expo-status-bar` | built-in `StatusBar` |
+| `expo-notifications` (Expo push tokens) | `@react-native-firebase/messaging` — registers a real **FCM token**, which is what the API has always expected (`{deviceId, fcmToken}`) and dispatches via Firebase Admin |
+
+**Run on a device/emulator** (Android Studio + JDK 17 required):
+
+```powershell
+npm install
+npm run dev:api                              # backend, separate terminal
+cd apps/mobile
+npx react-native run-android                 # builds, installs, starts Metro
+# later sessions: npm run dev:mobile (repo root) starts Metro only,
+# then press R in the app / reload from the dev menu
+```
+
+**Build a real APK for testing on any Android phone:**
+
+```powershell
+cd apps/mobile/android
+.\gradlew.bat assembleRelease
+# APK: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+```
+
+(Set `API_BASE_URL` in `src/config.js` to a reachable address **before** a
+release build — it is baked in. The debug signing key is committed for
+internal testing; configure a real release keystore before Play Store.)
+
+**Push notifications:** drop your Firebase `google-services.json` into
+`apps/mobile/android/app/` (Firebase console → project settings) — the
+Gradle plugin applies itself automatically when the file exists, and the
+app runs fine without it until then. Also set
+`FIREBASE_SERVICE_ACCOUNT_JSON` on the API.
+
+**App icon (rounded):** generated into `android/app/src/main/res` (legacy
+rounded mipmaps + adaptive icon) by `apps/mobile/scripts/generate-icons.py`.
+It uses **`LOGO.png` at the repository root** (your crane/buildings logo,
+committed) — the script crops its transparent margins and upscales it onto
+a white rounded tile. Replace LOGO.png and re-run
+`python3 apps/mobile/scripts/generate-icons.py` (pip `pillow` required)
+to regenerate; without LOGO.png a brand placeholder (gold roof/A on navy)
+is generated instead. The source is only ~143px, so a higher-resolution
+LOGO.png will make the launcher icon sharper.
+
+**Release/version bump:** bump `@ananta/constants` + the package versions
+as usual (`npm run version:check`), plus `versionName`/`versionCode` in
+`apps/mobile/android/app/build.gradle` (currently 1.1.0 / 10100).

@@ -1,8 +1,8 @@
 import { useState, useCallback } from "react";
 import { View, Text, ScrollView, StyleSheet, RefreshControl, Share } from "react-native";
 import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
+import LinearGradient from "react-native-linear-gradient";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, EmptyState, Button } from "@/components/ui";
 import { EarningsBars, SectionTitle } from "@/components/design";

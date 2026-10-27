@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Pressable } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
+import LinearGradient from "react-native-linear-gradient";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import Animated, { FadeInDown, FadeIn, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from "react-native-reanimated";
 import { Button } from "@/components/ui";
 import { useLogin } from "./api";
@@ -19,7 +19,7 @@ function GlowBlob({ style, size, color, drift = 26, duration = 5200, delay = 0 }
   return <Animated.View style={[{ position: "absolute", width: size, height: size, borderRadius: size / 2, backgroundColor: color }, style, animated]} />;
 }
 
-function IconInput({ icon, focused, setFocused, name, children }) {
+function IconInput({ icon, focused, name, children }) {
   return (
     <View style={[styles.inputWrap, focused === name && styles.inputWrapFocused]}>
       <Ionicons name={icon} size={18} color={focused === name ? colors.amber600 : colors.graphite300} />
@@ -64,7 +64,7 @@ export function LoginScreen({ navigation }) {
             <Text style={styles.formSub}>Sign in to see today's pay, attendance & more.</Text>
 
             <Text style={styles.label}>Mobile number</Text>
-            <IconInput icon="call-outline" name="phone" focused={focused} setFocused={setFocused}>
+            <IconInput icon="call-outline" name="phone" focused={focused}>
               <TextInput
                 style={styles.input}
                 placeholder="9876543210"
@@ -78,7 +78,7 @@ export function LoginScreen({ navigation }) {
             </IconInput>
 
             <Text style={styles.label}>Password</Text>
-            <IconInput icon="lock-closed-outline" name="password" focused={focused} setFocused={setFocused}>
+            <IconInput icon="lock-closed-outline" name="password" focused={focused}>
               <TextInput
                 style={styles.input}
                 placeholder="••••••••"
