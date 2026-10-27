@@ -1,11 +1,9 @@
 import axios from "axios";
-import Constants from "expo-constants";
 
 import { useAuthStore } from "@/stores/authStore";
 import { SecureTokenStore } from "@/lib/secureStore";
 import { APP_VERSION, useForceUpdateStore, versionHeaders } from "@/lib/version";
-
-const API_BASE_URL = Constants.expoConfig?.extra?.apiBaseUrl ?? "http://localhost:4000/api/v1";
+import { API_BASE_URL } from "@/config";
 
 export const api = axios.create({ baseURL: API_BASE_URL, timeout: 20000 });
 

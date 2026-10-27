@@ -1,48 +1,43 @@
-import * as Notifications from "expo-notifications";
-import Constants from "expo-constants";
-import { Platform } from "react-native";
+import messaging from "@react-native-firebase/messaging";
+import { Platform, PermissionsAndroid } from "react-native";
 import { api } from "@/lib/apiClient";
 import { SecureTokenStore } from "@/lib/secureStore";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
-
+/**
+ * Push notifications via Firebase Cloud Messaging (pure-RN replacement
+ * for expo-notifications). This also fixes the token contract: the API
+ * has always expected an FCM token (`POST /notifications/push-token`
+ * { deviceId, fcmToken }) and dispatches through Firebase Admin — the
+ * old Expo push token could never have been delivered to.
+ *
+ * Requires android/app/google-services.json (Firebase console) — until
+ * that file is added, every call here fails soft and the app runs fine
+ * without push.
+ */
 export async function registerForPushNotifications() {
   try {
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "default",
-        importance: Notifications.AndroidImportance.DEFAULT,
-      });
+    if (Platform.OS === "android" && Platform.Version >= 33) {
+      await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
     }
+    const authStatus = await messaging().requestPermission();
+    const enabled =
+      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+    if (!enabled) return;
 
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== "granted") return;
-
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    const tokenResponse = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
-    const expoPushToken = tokenResponse.data;
+    const fcmToken = await messaging().getToken();
+    if (!fcmToken) return;
 
     const deviceId = await SecureTokenStore.getOrCreateDeviceId();
-    await api.post("/notifications/push-token", { deviceId, expoPushToken });
+    await api.post("/notifications/push-token", { deviceId, fcmToken });
   } catch {
     // Push registration is a nice-to-have, never block app usage on failure.
   }
 }
 
+/** Foreground messages don't show a system banner — RootNavigator surfaces them. */
 export function subscribeToForegroundMessages(onMessage) {
-  const subscription = Notifications.addNotificationReceivedListener((notification) => {
-    onMessage?.(notification.request.content);
+  return messaging().onMessage(async (remoteMessage) => {
+    onMessage?.(remoteMessage.notification ?? {});
   });
-  return () => subscription.remove();
 }

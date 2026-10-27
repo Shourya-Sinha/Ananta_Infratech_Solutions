@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View, StyleSheet } from "react-native";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, Easing } from "react-native-reanimated";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@/lib/haptics";
 import { colors, radius } from "@/theme";
 
 export function formatINR(n, { sign = false } = {}) {

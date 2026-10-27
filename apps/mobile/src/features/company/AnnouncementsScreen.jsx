@@ -1,7 +1,7 @@
 import { View, Text, ScrollView, StyleSheet, TextInput, Alert } from "react-native";
 import { useState } from "react";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { ScreenHeader, Card, Button, EmptyState, Badge } from "@/components/ui";
 import { useAnnouncements, useManageAnnouncements, useCreateAnnouncement, useDeleteAnnouncement } from "./api";
 import { useAuthStore } from "@/stores/authStore";

@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { View, Text, ScrollView, StyleSheet, Pressable, Alert, ActionSheetIOS, Platform } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import * as Haptics from "expo-haptics";
+import { launchCamera, launchImageLibrary } from "react-native-image-picker";
+import * as Haptics from "@/lib/haptics";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { ScreenHeader, Card, Badge } from "@/components/ui";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { BrandFooter } from "@/components/BrandFooter";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { useMyDocuments, useUploadDocument } from "./documentsApi";
 import { colors, spacing } from "@/theme";
 
@@ -19,18 +19,25 @@ const REQUIRED_DOCUMENT_TYPES = [
 ];
 
 async function pickImage(source) {
-  const permission =
-    source === "camera"
-      ? await ImagePicker.requestCameraPermissionsAsync()
-      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+  // react-native-image-picker handles the runtime permission prompts
+  // itself (AndroidManifest CAMERA / media permissions are declared).
+  const options = { mediaType: "photo", quality: 0.7, saveToPhotos: false };
+  const result = source === "camera" ? await launchCamera(options) : await launchImageLibrary(options);
 
-  if (!permission.granted) {
-    Alert.alert("Permission needed", `Please allow ${source === "camera" ? "camera" : "photo library"} access to upload documents.`);
+  if (result.didCancel) return { canceled: true, assets: null };
+  if (result.errorCode) {
+    Alert.alert(
+      "Permission needed",
+      `Please allow ${source === "camera" ? "camera" : "photo library"} access to upload documents.`
+    );
     return { canceled: true, assets: null };
   }
-
-  const options = { mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7, allowsEditing: false };
-  return source === "camera" ? ImagePicker.launchCameraAsync(options) : ImagePicker.launchImageLibraryAsync(options);
+  const asset = result.assets?.[0];
+  if (!asset) return { canceled: true, assets: null };
+  return {
+    canceled: false,
+    assets: [{ uri: asset.uri, fileName: asset.fileName, mimeType: asset.type }]
+  };
 }
 
 export function WorkerDocumentsScreen() {

@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { View, Text, ScrollView, StyleSheet, RefreshControl } from "react-native";
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from "react-native-reanimated";
 import { useEffect } from "react";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui";

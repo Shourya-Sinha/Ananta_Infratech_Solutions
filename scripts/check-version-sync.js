@@ -11,8 +11,10 @@ const path = require("node:path");
 const root = path.join(__dirname, "..");
 const { RELEASE_VERSION } = require(path.join(root, "packages/constants/src/version"));
 
+// Mobile is pure React Native: its release version lives in package.json
+// (and, for the store, in android/app/build.gradle versionName / iOS).
+// The app reads RELEASE_VERSION at runtime via src/config.js (@ananta/constants).
 const checks = [
-  ["apps/mobile/app.json (expo.version)", JSON.parse(fs.readFileSync(path.join(root, "apps/mobile/app.json"), "utf8")).expo.version],
   ["apps/mobile/package.json", JSON.parse(fs.readFileSync(path.join(root, "apps/mobile/package.json"), "utf8")).version],
   ["apps/admin-web/package.json", JSON.parse(fs.readFileSync(path.join(root, "apps/admin-web/package.json"), "utf8")).version],
   ["services/api/package.json", JSON.parse(fs.readFileSync(path.join(root, "services/api/package.json"), "utf8")).version],
