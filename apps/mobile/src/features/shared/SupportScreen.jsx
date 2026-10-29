@@ -37,8 +37,9 @@ export function SupportScreen() {
           <TextInput style={styles.replyInput} placeholder="Type a reply…" value={reply} onChangeText={setReply} />
           <Button
             title="Send"
+            loading={postMessage.isPending}
             onPress={() => {
-              if (reply.trim()) {
+              if (reply.trim() && !postMessage.isPending) {
                 postMessage.mutate(reply, { onSuccess: () => setReply("") });
               }
             }} />
@@ -66,6 +67,7 @@ export function SupportScreen() {
         
           <Button
           title={createTicket.isPending ? "Submitting…" : "Submit"}
+          loading={createTicket.isPending}
           onPress={() => {
             if (newSubject && newMessage) {
               createTicket.mutate(

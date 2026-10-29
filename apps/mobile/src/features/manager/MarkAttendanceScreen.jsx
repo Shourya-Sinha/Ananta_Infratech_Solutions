@@ -126,7 +126,7 @@ export function MarkAttendanceScreen() {
                 </View>
               }
 
-              <Button title="Save" onPress={() => saveWorker(worker)} variant="primary" disabled={!row.status} />
+              <Button title="Save" onPress={() => saveWorker(worker)} variant="primary" disabled={!row.status || markAttendance.isPending} loading={markAttendance.isPending} />
             </View>);
 
         })}

@@ -37,14 +37,14 @@ export function LeaveScreen() {
 
       {isWorker && (
         <Card style={{ gap: spacing.sm, marginBottom: spacing.md }}>
-          <TextInput style={styles.input} placeholder="From date (YYYY-MM-DD)" placeholderTextColor={colors.graphite300} value={form.fromDate} onChangeText={(v) => setForm({ ...form, fromDate: v })} />
-          <TextInput style={styles.input} placeholder="To date (YYYY-MM-DD)" placeholderTextColor={colors.graphite300} value={form.toDate} onChangeText={(v) => setForm({ ...form, toDate: v })} />
+          <TextInput editable={!request.isPending} style={styles.input} placeholder="From date (YYYY-MM-DD)" placeholderTextColor={colors.graphite300} value={form.fromDate} onChangeText={(v) => setForm({ ...form, fromDate: v })} />
+          <TextInput editable={!request.isPending} style={styles.input} placeholder="To date (YYYY-MM-DD)" placeholderTextColor={colors.graphite300} value={form.toDate} onChangeText={(v) => setForm({ ...form, toDate: v })} />
           <View style={styles.chipRow}>
             {["PAID", "UNPAID"].map((t) => (
               <Text key={t} onPress={() => setForm({ ...form, leaveType: t })} style={[styles.chip, form.leaveType === t && styles.chipActive]}>{t} leave</Text>
             ))}
           </View>
-          <TextInput style={styles.input} placeholder="Reason (optional)" placeholderTextColor={colors.graphite300} value={form.reason} onChangeText={(v) => setForm({ ...form, reason: v })} />
+          <TextInput editable={!request.isPending} style={styles.input} placeholder="Reason (optional)" placeholderTextColor={colors.graphite300} value={form.reason} onChangeText={(v) => setForm({ ...form, reason: v })} />
           <Button title="Request leave" onPress={submit} loading={request.isPending} />
         </Card>
       )}

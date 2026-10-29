@@ -39,8 +39,8 @@ export function AnnouncementsScreen() {
           <Button title={showForm ? "Close" : "＋ New announcement"} variant="accent" onPress={() => setShowForm((v) => !v)} />
           {showForm && (
             <Card style={{ marginTop: spacing.md, gap: spacing.sm }}>
-              <TextInput style={styles.input} placeholder="Title e.g. Holiday on 15 Aug" placeholderTextColor={colors.graphite300} value={form.title} onChangeText={(v) => setForm({ ...form, title: v })} />
-              <TextInput style={[styles.input, { minHeight: 76, textAlignVertical: "top" }]} multiline placeholder="Message for the team…" placeholderTextColor={colors.graphite300} value={form.body} onChangeText={(v) => setForm({ ...form, body: v })} />
+              <TextInput editable={!create.isPending} style={styles.input} placeholder="Title e.g. Holiday on 15 Aug" placeholderTextColor={colors.graphite300} value={form.title} onChangeText={(v) => setForm({ ...form, title: v })} />
+              <TextInput editable={!create.isPending} style={[styles.input, { minHeight: 76, textAlignVertical: "top" }]} multiline placeholder="Message for the team…" placeholderTextColor={colors.graphite300} value={form.body} onChangeText={(v) => setForm({ ...form, body: v })} />
               <View style={styles.chipRow}>
                 {AUDIENCES.map((a) => (
                   <Text key={a} onPress={() => setForm({ ...form, audience: a })} style={[styles.chip, form.audience === a && styles.chipActive]}>{a}</Text>

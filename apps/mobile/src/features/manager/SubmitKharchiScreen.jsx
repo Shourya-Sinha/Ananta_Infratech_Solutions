@@ -70,12 +70,12 @@ export function SubmitKharchiScreen({ navigation }) {
         </View>
 
         <Text style={styles.label}>Amount (₹)</Text>
-        <TextInput style={styles.input} keyboardType="numeric" value={amount} onChangeText={setAmount} placeholder="300" />
+        <TextInput editable={!submit.isPending} style={styles.input} keyboardType="numeric" value={amount} onChangeText={setAmount} placeholder="300" />
 
         <Text style={styles.label}>Reason</Text>
-        <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="e.g. Lunch for site team" />
+        <TextInput editable={!submit.isPending} style={styles.input} value={reason} onChangeText={setReason} placeholder="e.g. Lunch for site team" />
 
-        <Button title={submit.isPending ? "Submitting…" : "Submit request"} onPress={onSubmit} variant="accent" />
+        <Button title={submit.isPending ? "Submitting…" : "Submit request"} onPress={onSubmit} variant="accent" loading={submit.isPending} />
       </Card>
     </ScrollView>);
 
