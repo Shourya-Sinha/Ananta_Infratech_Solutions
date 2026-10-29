@@ -5,7 +5,7 @@ import { PressScale } from "@/components/interactive";
 import { colors, spacing, radius, gradients } from "@/theme";
 
 /** Company website — workers and managers can open it from the app. */
-export const WEBSITE_URL = "https://anantainformationsolutions.com";
+export const WEBSITE_URL = "https://anantainfratechsolutions.com";
 
 export function openWebsite() {
   Linking.openURL(WEBSITE_URL).catch(() =>
@@ -16,7 +16,7 @@ export function openWebsite() {
 /** Prominent gradient pill: globe + "Visit our website". */
 export function WebsiteButton({ style }) {
   return (
-    <PressScale onPress={openWebsite} accessibilityLabel="Visit our website, anantainformationsolutions.com" style={style}>
+    <PressScale onPress={openWebsite} accessibilityLabel="Visit our website, anantainfratechsolutions.com" style={style}>
       <LinearGradient colors={gradients.teal} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btn}>
         <Ionicons name="globe-outline" size={17} color={colors.white} />
         <Text style={styles.text}>Visit our website</Text>

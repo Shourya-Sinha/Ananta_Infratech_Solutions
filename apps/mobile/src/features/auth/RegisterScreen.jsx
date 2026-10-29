@@ -5,7 +5,7 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import Animated, { FadeInDown, FadeIn, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from "react-native-reanimated";
 import { Button } from "@/components/ui";
 import { BrandFooter } from "@/components/BrandFooter";
-import { WideLogo } from "@/components/BrandLogo";
+import { GlowSmallLogo } from "@/components/BrandLogo";
 import { WebsiteButton } from "@/components/WebsiteButton";
 import { useRegisterStart, useVerifyRegistrationOtp, useLogin } from "./api";
 import { colors, spacing, radius, shadow, gradients } from "@/theme";
@@ -128,7 +128,7 @@ export function RegisterScreen({ navigation }) {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingTop: spacing.xxl }} keyboardShouldPersistTaps="handled">
           <Animated.View entering={FadeIn.duration(350)} style={styles.header}>
-            <WideLogo width={232} />
+            <GlowSmallLogo size={78} />
             <Text style={styles.title}>Create your account</Text>
             <Text style={styles.subtitle}>Register once — then track salary, attendance & documents in the app.</Text>
           </Animated.View>
@@ -234,7 +234,7 @@ export function RegisterScreen({ navigation }) {
             <Pressable onPress={() => navigation.goBack()} style={{ alignItems: "center", marginTop: spacing.sm }}>
               <Text style={styles.loginLink}>Already registered? <Text style={{ color: colors.gold, fontWeight: "700" }}>Sign in →</Text></Text>
             </Pressable>
-            <BrandFooter dark />
+            <BrandFooter dark showMark={false} />
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>

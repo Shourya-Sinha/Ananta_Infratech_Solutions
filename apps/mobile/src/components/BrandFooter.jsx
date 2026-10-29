@@ -10,17 +10,17 @@ import { PressScale } from "@/components/interactive";
  * documents, settings/profile, login) and reusable anywhere else:
  * "Developed & maintained by Shourya — Ananta Infratech Solutions".
  */
-export function BrandFooter({ dark = false, style }) {
+export function BrandFooter({ dark = false, style, showMark = true }) {
   const main = dark ? "rgba(255,255,255,0.85)" : colors.graphite700;
   const sub = dark ? "rgba(255,255,255,0.5)" : colors.graphite300;
   return (
     <View style={[styles.wrap, style]} accessibilityLabel="Developed and maintained by Shourya, Ananta Infratech Solutions">
-      <SmallLogo size={30} style={{ marginBottom: 4 }} />
+      {showMark && <SmallLogo size={30} style={{ marginBottom: 4 }} />}
       <Text style={[styles.main, { color: main }]}>
         Developed &amp; maintained by <Text style={styles.name}>Shourya</Text>
       </Text>
       <Text style={[styles.sub, { color: sub }]}>Ananta Infratech Solutions</Text>
-      <PressScale onPress={openWebsite} haptic accessibilityLabel="Visit our website, anantainformationsolutions.com" style={styles.webRow}>
+      <PressScale onPress={openWebsite} haptic accessibilityLabel="Visit our website, anantainfratechsolutions.com" style={styles.webRow}>
         <Ionicons name="globe-outline" size={12} color={colors.teal} />
         <Text style={styles.webText}>Visit our website</Text>
         <Ionicons name="open-outline" size={10} color={colors.teal} />
