@@ -59,10 +59,10 @@ export function RequestKharchiScreen() {
           )}
         </View>
         <Text style={styles.label}>Amount (₹)</Text>
-        <TextInput style={styles.input} keyboardType="numeric" value={amount} onChangeText={setAmount} placeholder="300" />
+        <TextInput editable={!request.isPending} style={styles.input} keyboardType="numeric" value={amount} onChangeText={setAmount} placeholder="300" />
         <Text style={styles.label}>Reason</Text>
-        <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="e.g. Tools purchase" />
-        <Button title={request.isPending ? "Submitting…" : "Submit request"} onPress={submit} variant="accent" />
+        <TextInput editable={!request.isPending} style={styles.input} value={reason} onChangeText={setReason} placeholder="e.g. Tools purchase" />
+        <Button title={request.isPending ? "Submitting…" : "Submit request"} onPress={submit} variant="accent" loading={request.isPending} />
       </Card>
 
       <NetPreview currentNet={currentNet} amountRupees={amount} kind="kharchi" />

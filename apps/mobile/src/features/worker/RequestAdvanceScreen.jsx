@@ -45,10 +45,10 @@ export function RequestAdvanceScreen() {
       <ScreenHeader title="Request advance" />
       <Card style={{ gap: spacing.sm, marginBottom: spacing.lg }}>
         <Text style={styles.label}>Amount (₹)</Text>
-        <TextInput style={styles.input} keyboardType="numeric" value={amount} onChangeText={setAmount} placeholder="2000" />
+        <TextInput editable={!request.isPending} style={styles.input} keyboardType="numeric" value={amount} onChangeText={setAmount} placeholder="2000" />
         <Text style={styles.label}>Reason</Text>
-        <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="e.g. Family medical expense" />
-        <Button title={request.isPending ? "Submitting…" : "Submit request"} onPress={submit} variant="accent" />
+        <TextInput editable={!request.isPending} style={styles.input} value={reason} onChangeText={setReason} placeholder="e.g. Family medical expense" />
+        <Button title={request.isPending ? "Submitting…" : "Submit request"} onPress={submit} variant="accent" loading={request.isPending} />
       </Card>
 
       <NetPreview currentNet={currentNet} amountRupees={amount} kind="advance" />

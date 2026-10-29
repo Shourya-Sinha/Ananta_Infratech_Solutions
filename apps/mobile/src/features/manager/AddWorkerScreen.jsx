@@ -70,7 +70,8 @@ export function AddWorkerScreen({ navigation }) {
         <Button
           title={registerStart.isPending || selectWorkType.isPending ? "Registering…" : "Register worker"}
           onPress={submit}
-          variant="accent" />
+          variant="accent"
+          loading={registerStart.isPending || selectWorkType.isPending} />
         
       </Card>
 
@@ -86,7 +87,7 @@ function Field(props) {
   return (
     <View>
       <Text style={styles.label}>{props.label}</Text>
-      <TextInput
+      <TextInput editable={!registerStart.isPending}
         style={styles.input}
         placeholder={props.placeholder}
         placeholderTextColor={colors.graphite300}
