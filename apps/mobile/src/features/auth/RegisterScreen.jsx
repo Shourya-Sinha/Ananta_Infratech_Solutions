@@ -5,6 +5,8 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import Animated, { FadeInDown, FadeIn, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from "react-native-reanimated";
 import { Button } from "@/components/ui";
 import { BrandFooter } from "@/components/BrandFooter";
+import { WideLogo } from "@/components/BrandLogo";
+import { WebsiteButton } from "@/components/WebsiteButton";
 import { useRegisterStart, useVerifyRegistrationOtp, useLogin } from "./api";
 import { colors, spacing, radius, shadow, gradients } from "@/theme";
 
@@ -126,9 +128,7 @@ export function RegisterScreen({ navigation }) {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingTop: spacing.xxl }} keyboardShouldPersistTaps="handled">
           <Animated.View entering={FadeIn.duration(350)} style={styles.header}>
-            <LinearGradient colors={gradients.gold} style={styles.logoMark}>
-              <Ionicons name="person-add" size={28} color={colors.white} />
-            </LinearGradient>
+            <WideLogo width={232} />
             <Text style={styles.title}>Create your account</Text>
             <Text style={styles.subtitle}>Register once — then track salary, attendance & documents in the app.</Text>
           </Animated.View>
@@ -230,6 +230,7 @@ export function RegisterScreen({ navigation }) {
               After this, you'll pick your work type and upload your ID documents. Admin reviews and activates your
               account before you can be marked present at a site.
             </Text>
+            <WebsiteButton style={{ marginTop: spacing.lg, marginHorizontal: spacing.xl }} />
             <Pressable onPress={() => navigation.goBack()} style={{ alignItems: "center", marginTop: spacing.sm }}>
               <Text style={styles.loginLink}>Already registered? <Text style={{ color: colors.gold, fontWeight: "700" }}>Sign in →</Text></Text>
             </Pressable>
@@ -244,8 +245,7 @@ export function RegisterScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { alignItems: "center", marginBottom: spacing.lg },
-  logoMark: { width: 60, height: 60, borderRadius: 19, alignItems: "center", justifyContent: "center", marginBottom: spacing.md, ...shadow.lifted },
-  title: { fontSize: 23, fontWeight: "800", color: colors.white, letterSpacing: -0.3 },
+  title: { fontSize: 23, fontWeight: "800", color: colors.white, letterSpacing: -0.3, marginTop: spacing.lg },
   subtitle: { fontSize: 12.5, color: "rgba(255,255,255,0.6)", marginTop: 5, textAlign: "center", lineHeight: 17, paddingHorizontal: spacing.md },
   steps: { flexDirection: "row", justifyContent: "center", alignItems: "flex-start", marginBottom: spacing.lg },
   stepItem: { flexDirection: "row", alignItems: "center", gap: 6 },

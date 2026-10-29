@@ -2,8 +2,8 @@
 """
 Generate every Android launcher-icon asset for the app.
 
-Source of truth: LOGO.png at the REPOSITORY ROOT. If it exists it's used;
-drop your real logo there and re-run:
+Source of truth: small_logo.png at the REPOSITORY ROOT (LOGO.png fallback).
+Drop your real logo there and re-run:
     python3 apps/mobile/scripts/generate-icons.py
 If LOGO.png is absent, a brand placeholder is drawn (gold roof/A mark on
 deep navy) so the project always builds with a proper rounded icon.
@@ -27,7 +27,10 @@ except ImportError:
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 MOBILE = os.path.join(ROOT, "apps", "mobile")
-LOGO = os.path.join(ROOT, "LOGO.png")
+# Brand source: small_logo.png at the repo root (falls back to LOGO.png).
+LOGO = os.path.join(ROOT, "small_logo.png")
+if not os.path.exists(LOGO):
+    LOGO = os.path.join(ROOT, "LOGO.png")
 RES = os.path.join(MOBILE, "android", "app", "src", "main", "res")
 
 NAVY = (11, 18, 32, 255)

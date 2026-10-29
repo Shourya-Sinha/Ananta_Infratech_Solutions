@@ -1,4 +1,5 @@
 import { useState } from "react";
+import smallLogo from "@/assets/small_logo.png";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   BarChart3,
@@ -17,7 +18,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
-  Sparkles,
+
   Truck,
   UserCog,
   Users,
@@ -119,7 +120,7 @@ export function AppShell() {
 
             <aside className={cx("app-sidebar", sidebarOpen ? "app-sidebar-open" : "app-sidebar-closed")}>
               <div className="brand-block">
-                <div className="brand-mark"><Sparkles size={19} /></div>
+                <div className="brand-mark" style={{ background: "#fff", overflow: "hidden" }}><img src={smallLogo} alt="Ananta Infratech Solutions" style={{ width: "88%", height: "88%", objectFit: "contain" }} /></div>
                 <div className="min-w-0">
                   <p className="truncate font-display text-[15px] font-bold tracking-tight text-white">Ananta Infratech</p>
                   <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/45">Operations OS</p>

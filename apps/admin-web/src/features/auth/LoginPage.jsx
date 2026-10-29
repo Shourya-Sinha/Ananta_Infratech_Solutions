@@ -1,4 +1,5 @@
 import { useForm } from "react-hook-form";
+import wideLogo from "@/assets/wide_logo.png";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowRight, LockKeyhole, Sparkles } from "lucide-react";
 import { useLogin } from "./api";
@@ -33,10 +34,16 @@ export function LoginPage() {
               <small>Operations OS</small>
             </span>
           </div>
+          <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", margin: "18px 0 4px", maxWidth: 340 }}>
+            <img src={wideLogo} alt="Ananta Infratech Solutions" style={{ width: "100%", display: "block" }} />
+          </div>
           <p className="login-kicker">Build with clarity</p>
           <h1>Every site.<br /><span>One clear view.</span></h1>
           <p className="login-copy">Coordinate workforce, attendance, finance and field operations from one calm command centre.</p>
           <div className="login-story-line"><span /><span /><span /></div>
+          <a href="https://anantainformationsolutions.com" target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 16, color: "#7dd3c8", fontWeight: 700, fontSize: 13 }}>
+            Visit our website — anantainformationsolutions.com
+          </a>
         </div>
 
         <form onSubmit={onSubmit} className="login-card">
