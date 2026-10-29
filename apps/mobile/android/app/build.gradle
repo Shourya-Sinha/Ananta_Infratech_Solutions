@@ -15,6 +15,18 @@ if (file("google-services.json").exists()) {
  */
 react {
     /* Folders */
+    // The root of the project: apps/mobile
+    root = file("../..")
+
+    // React Native is hoisted inside the root node_modules
+    reactNativeDir = file("../../../../node_modules/react-native")
+
+    // Codegen is hoisted inside the root node_modules
+    codegenDir = file("../../../../node_modules/@react-native/codegen")
+
+    // React Native CLI entrypoint
+    cliFile = file("../../../../node_modules/react-native/cli.js")
+    /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '..'
     // root = file("../")
     //   The folder where the react-native NPM package is. Default is ../node_modules/react-native
@@ -53,6 +65,7 @@ react {
     /* Hermes Commands */
     //   The hermes compiler command to run. By default it is 'hermesc'
     // hermesCommand = "$rootDir/my-custom-hermesc/bin/hermesc"
+    hermesCommand = "D:/Archives/Iqoo Backup/CODES/Ananta_Infratech_Solutions/node_modules/react-native/sdks/hermesc/win64-bin/hermesc.exe"
     //
     //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
     // hermesFlags = ["-O", "-output-source-map"]
@@ -121,5 +134,5 @@ dependencies {
         implementation jscFlavor
     }
 }
-
-apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
+apply from: file("../../../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+applyNativeModulesAppBuildGradle(project)
