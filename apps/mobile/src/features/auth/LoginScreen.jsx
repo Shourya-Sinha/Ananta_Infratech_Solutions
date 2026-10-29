@@ -7,6 +7,8 @@ import { Button } from "@/components/ui";
 import { useLogin } from "./api";
 import { colors, spacing, radius, shadow, gradients, motion } from "@/theme";
 import { BrandFooter } from "@/components/BrandFooter";
+import { WideLogo } from "@/components/BrandLogo";
+import { WebsiteButton } from "@/components/WebsiteButton";
 
 /** Slowly drifting glow blob behind the login card. */
 function GlowBlob({ style, size, color, drift = 26, duration = 5200, delay = 0 }) {
@@ -44,10 +46,7 @@ export function LoginScreen({ navigation }) {
       <KeyboardAvoidingView style={{ flex: 1, justifyContent: "center" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={{ padding: spacing.xl }}>
           <Animated.View entering={FadeIn.duration(motion.slow)} style={styles.header}>
-            <LinearGradient colors={gradients.gold} style={styles.logoMark}>
-              <Ionicons name="construct" size={30} color={colors.white} />
-            </LinearGradient>
-            <Text style={styles.title}>Ananta Infratech</Text>
+            <WideLogo width={248} />
             <Text style={styles.subtitle}>Workforce & Project Management</Text>
             <View style={styles.trustRow}>
               {[["calendar-outline", "Attendance"], ["wallet-outline", "Salary"], ["business-outline", "Sites"]].map(([icon, x]) => (
@@ -114,6 +113,7 @@ export function LoginScreen({ navigation }) {
 
           <Animated.View entering={FadeIn.delay(300).duration(motion.slow)}>
             <Text style={styles.footerNote}>Attendance is marked by your Manager/Admin.{"\n"}Your salary, advances & kharchi update live.</Text>
+            <WebsiteButton style={{ marginTop: spacing.lg, marginHorizontal: spacing.xl }} />
             <Pressable style={styles.registerRow} onPress={() => navigation.navigate("Register")}>
               <Text style={styles.registerText}>
                 New worker? <Text style={styles.registerLink}>Register →</Text>
@@ -130,17 +130,7 @@ export function LoginScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { alignItems: "center", marginBottom: spacing.xl },
-  logoMark: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.md,
-    ...shadow.lifted,
-  },
-  title: { fontSize: 24, fontWeight: "800", color: colors.white, letterSpacing: -0.3 },
-  subtitle: { fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 4 },
+  subtitle: { fontSize: 13, color: "rgba(255,255,255,0.65)", marginTop: spacing.md, fontWeight: "600" },
   form: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing.lg, ...shadow.lifted },
   formTitle: { fontSize: 17, fontWeight: "800", color: colors.graphite900 },
   formSub: { fontSize: 12, color: colors.graphite500, marginTop: 3, marginBottom: spacing.xs },
