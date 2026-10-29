@@ -63,7 +63,7 @@ export function ProfileScreen() {
       <MenuRow delay={190} icon="megaphone-outline" tint={colors.teal} label="Announcements" sub={isAdmin ? "Publish & manage company notices" : "Official company notices"} onPress={() => navigation.navigate("Announcements")} />
       <MenuRow delay={220} icon="notifications-outline" tint={colors.graphite700} label="Notifications" onPress={() => navigation.navigate("Notifications")} />
       <MenuRow delay={250} icon="chatbubbles-outline" tint={colors.graphite700} label="Support" sub="Chat with the office" onPress={() => navigation.navigate("Support")} />
-      <MenuRow delay={280} icon="globe-outline" tint={colors.teal} label="Visit our website" sub="anantainformationsolutions.com — know more about us" onPress={openWebsite} />
+      <MenuRow delay={280} icon="globe-outline" tint={colors.teal} label="Visit our website" sub="anantainfratechsolutions.com — know more about us" onPress={openWebsite} />
 
       <SectionTitle>Account</SectionTitle>
       <Card style={{ gap: spacing.sm, marginBottom: spacing.md }}>
@@ -76,7 +76,7 @@ export function ProfileScreen() {
       <Card style={{ gap: spacing.sm, marginBottom: spacing.md }}>
         <WideLogo width={210} style={{ alignSelf: "center", marginBottom: spacing.sm, shadowOpacity: 0, elevation: 0 }} />
         <Row label="Company" value="Ananta Infratech Solutions" />
-        <Row label="Website" value="anantainformationsolutions.com" />
+        <Row label="Website" value="anantainfratechsolutions.com" />
         <Row label="Developed & maintained by" value="Shourya" />
         <Row label="Support" value="Chat with the office (Support)" />
       </Card>

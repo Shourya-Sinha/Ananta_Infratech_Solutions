@@ -41,8 +41,8 @@ export function LoginPage() {
           <h1>Every site.<br /><span>One clear view.</span></h1>
           <p className="login-copy">Coordinate workforce, attendance, finance and field operations from one calm command centre.</p>
           <div className="login-story-line"><span /><span /><span /></div>
-          <a href="https://anantainformationsolutions.com" target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 16, color: "#7dd3c8", fontWeight: 700, fontSize: 13 }}>
-            Visit our website — anantainformationsolutions.com
+          <a href="https://anantainfratechsolutions.com" target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 16, color: "#7dd3c8", fontWeight: 700, fontSize: 13 }}>
+            Visit our website — anantainfratechsolutions.com
           </a>
         </div>
 

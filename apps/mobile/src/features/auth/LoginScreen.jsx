@@ -7,7 +7,7 @@ import { Button } from "@/components/ui";
 import { useLogin } from "./api";
 import { colors, spacing, radius, shadow, gradients, motion } from "@/theme";
 import { BrandFooter } from "@/components/BrandFooter";
-import { WideLogo } from "@/components/BrandLogo";
+import { GlowSmallLogo } from "@/components/BrandLogo";
 import { WebsiteButton } from "@/components/WebsiteButton";
 
 /** Slowly drifting glow blob behind the login card. */
@@ -46,7 +46,8 @@ export function LoginScreen({ navigation }) {
       <KeyboardAvoidingView style={{ flex: 1, justifyContent: "center" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={{ padding: spacing.xl }}>
           <Animated.View entering={FadeIn.duration(motion.slow)} style={styles.header}>
-            <WideLogo width={248} />
+            <GlowSmallLogo size={86} />
+            <Text style={styles.title}>Ananta Infratech</Text>
             <Text style={styles.subtitle}>Workforce & Project Management</Text>
             <View style={styles.trustRow}>
               {[["calendar-outline", "Attendance"], ["wallet-outline", "Salary"], ["business-outline", "Sites"]].map(([icon, x]) => (
@@ -119,7 +120,7 @@ export function LoginScreen({ navigation }) {
                 New worker? <Text style={styles.registerLink}>Register →</Text>
               </Text>
             </Pressable>
-            <BrandFooter dark />
+            <BrandFooter dark showMark={false} />
           </Animated.View>
         </View>
       </KeyboardAvoidingView>
@@ -130,7 +131,8 @@ export function LoginScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { alignItems: "center", marginBottom: spacing.xl },
-  subtitle: { fontSize: 13, color: "rgba(255,255,255,0.65)", marginTop: spacing.md, fontWeight: "600" },
+  title: { fontSize: 23, fontWeight: "800", color: colors.white, letterSpacing: -0.3, marginTop: spacing.sm },
+  subtitle: { fontSize: 13, color: "rgba(255,255,255,0.65)", marginTop: 4, fontWeight: "600" },
   form: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing.lg, ...shadow.lifted },
   formTitle: { fontSize: 17, fontWeight: "800", color: colors.graphite900 },
   formSub: { fontSize: 12, color: colors.graphite500, marginTop: 3, marginBottom: spacing.xs },
