@@ -604,3 +604,9 @@ LOGO.png will make the launcher icon sharper.
 **Release/version bump:** bump `@ananta/constants` + the package versions
 as usual (`npm run version:check`), plus `versionName`/`versionCode` in
 `apps/mobile/android/app/build.gradle` (currently 1.1.0 / 10100).
+
+## Mobile errors & toasts (latest)
+
+**Exact server errors, always.** The API already sent precise reasons (e.g. a 422's per-field validation messages), but axios failures bypassed the app's success-path parsing, so users saw the generic "Request failed with status code 422". `unwrap()` in `apps/mobile/src/lib/apiClient.js` now normalizes every failure via `normalizeApiError()`: validation errors expand per field ("Mobile number: Enter a valid Indian mobile number · Password: must contain a number…"), other errors keep the server's own message (already-registered, wrong OTP…), and connectivity failures say so plainly. The normalized error carries `code`/`status`/`fieldErrors` for programmatic handling.
+
+**Custom toasts, not system alerts.** A branded toast system (`apps/mobile/src/components/Toast.jsx`, zustand store + `ToastHost` mounted at the app root) replaces `Alert.alert` for all success/error/warning/info messages app-wide (registration, OTP, attendance, advances, kharchi, salary rate, documents, announcements, leave, push foreground notifications…): slides in at the top, colour-coded icon (teal success, red error, amber warning, blue info), auto-dismisses, and every toast has a **close (×) button**. Use `toast.success/error/warning/info(title, message)` anywhere. Only genuinely interactive choices (Delete announcement?, Take Photo vs Library) still use `Alert`, because a toast cannot ask a question.

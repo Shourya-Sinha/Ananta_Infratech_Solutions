@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, StyleSheet, TextInput, Alert } from "react-native";
+import { View, Text, ScrollView, StyleSheet, TextInput } from "react-native";
+import { toast } from "@/components/Toast";
 import { useState } from "react";
 import { ScreenHeader, Card, Button, EmptyState } from "@/components/ui";
 import { formatINR } from "@/components/interactive";
@@ -28,11 +29,11 @@ export function SiteFinanceScreen() {
   const saveBilling = () => {
     const billedAmountRupees = Number(billed);
     if (!selected || !Number.isFinite(billedAmountRupees) || billedAmountRupees < 0) {
-      return Alert.alert("Enter this month's billing amount (₹)");
+      return toast.warning("Enter this month's billing amount (₹)");
     }
     setBilling.mutate(
       { siteId: selected, month, billedAmountRupees, receivedAmountRupees: received === "" ? undefined : Number(received) },
-      { onSuccess: () => Alert.alert("Billing saved"), onError: (e) => Alert.alert("Could not save", e?.response?.data?.message ?? e.message) }
+      { onSuccess: () => toast.success("Billing saved"), onError: (e) => toast.error("Could not save", e.message) }
     );
   };
 

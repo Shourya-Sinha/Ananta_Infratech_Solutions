@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, StyleSheet, TextInput, Alert } from "react-native";
+import { View, Text, ScrollView, StyleSheet, TextInput } from "react-native";
+import { toast } from "@/components/Toast";
 import { useState } from "react";
 import { ScreenHeader, Card, Button, EmptyState } from "@/components/ui";
 import { formatINR } from "@/components/interactive";
@@ -29,17 +30,17 @@ export function SetSalaryRateScreen() {
 
   const save = () => {
     const amountRupees = Number(amount);
-    if (!selected) return Alert.alert("Select a worker first");
-    if (!Number.isFinite(amountRupees) || amountRupees <= 0) return Alert.alert("Enter a valid amount in rupees");
+    if (!selected) return toast.warning("Select a worker first");
+    if (!Number.isFinite(amountRupees) || amountRupees <= 0) return toast.warning("Enter a valid amount in rupees");
     setRate.mutate(
       { workerId: selected, mode, amountRupees },
       {
         onSuccess: (rates) =>
-          Alert.alert(
+          toast.success(
             "Salary rate saved",
             `Per hour ${formatINR(rates.hourlyRatePaise / 100)} · Per day ${formatINR(rates.dailyRatePaise / 100)} · Per month approx ${formatINR(rates.monthlySalaryPaise / 100)}`
           ),
-        onError: (e) => Alert.alert("Could not save", e?.response?.data?.message ?? e.message)
+        onError: (e) => toast.error("Could not save", e.message)
       }
     );
   };

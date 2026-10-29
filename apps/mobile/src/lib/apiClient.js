@@ -86,12 +86,75 @@ api.interceptors.response.use(
   }
 );
 
+const FIELD_LABELS = {
+  fullName: "Full name",
+  phone: "Mobile number",
+  password: "Password",
+  confirmPassword: "Confirm password",
+  address: "Address",
+  email: "Email",
+  otp: "OTP",
+  amount: "Amount",
+  reason: "Reason",
+  workerId: "Worker",
+  workTypeId: "Work type",
+  dailyRateRupees: "Per-day wage"
+};
+
+function humanizeField(field) {
+  if (FIELD_LABELS[field]) return FIELD_LABELS[field];
+  return field.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+}
+
+/**
+ * Turn an axios failure into a normal Error carrying the SERVER'S EXACT
+ * message. Before this, a 422 surfaced to users as axios's generic
+ * "Request failed with status code 422" even though the API had sent
+ * the precise reason (e.g. "Enter a valid Indian mobile number").
+ * Validation errors are expanded per field; everything else keeps the
+ * server's own message (already-registered, wrong OTP, etc.).
+ */
+export function normalizeApiError(error) {
+  if (error instanceof Error && error.code && error.status) return error;
+  const data = error?.response?.data;
+  const serverError = data?.error;
+  const status = error?.response?.status;
+
+  let message;
+  if (serverError?.details?.fieldErrors || serverError?.details?.formErrors) {
+    const parts = [];
+    for (const [field, msgs] of Object.entries(serverError.details.fieldErrors ?? {})) {
+      for (const m of msgs ?? []) parts.push(`${humanizeField(field)}: ${m}`);
+    }
+    for (const m of serverError.details.formErrors ?? []) parts.push(m);
+    message = parts.length ? parts.join("\n") : serverError.message;
+  } else if (serverError?.message) {
+    message = serverError.message;
+  } else if (!error?.response) {
+    message = "Can't reach the server. Check your internet connection and try again.";
+  } else {
+    message = error?.message ?? "Something went wrong. Please try again.";
+  }
+
+  const err = new Error(message);
+  err.code = serverError?.code ?? (status ? `HTTP_${status}` : "NETWORK_ERROR");
+  err.status = status;
+  err.details = serverError?.details;
+  err.fieldErrors = serverError?.details?.fieldErrors;
+  return err;
+}
+
 export async function unwrap(promise) {
-  const res = await promise;
+  let res;
+  try {
+    res = await promise;
+  } catch (error) {
+    throw normalizeApiError(error);
+  }
   if (res.data.success) return res.data.data;
-  const error = new Error(res.data.error.message);
-  error.code = res.data.error.code;
-  throw error;
+  const error = new Error(res.data.error?.message ?? "Something went wrong. Please try again.");
+  error.code = res.data.error?.code;
+  throw normalizeApiError(error);
 }
 
 export { API_BASE_URL };

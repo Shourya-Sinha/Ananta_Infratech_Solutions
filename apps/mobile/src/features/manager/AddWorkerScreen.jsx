@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { View, Text, ScrollView, StyleSheet, TextInput, Alert } from "react-native";
+import { toast } from "@/components/Toast";
+import { View, Text, ScrollView, StyleSheet, TextInput } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/lib/apiClient";
 import { Button, ScreenHeader, Card } from "@/components/ui";
@@ -26,13 +27,13 @@ export function AddWorkerScreen({ navigation }) {
 
   const submit = async () => {
     if (!fullName || !phone || !address || !workTypeId) {
-      Alert.alert("Missing information", "Please fill in all fields and select a work type.");
+      toast.warning("Missing information", "Please fill in all fields and select a work type.");
       return;
     }
     try {
       const { userId, devOtp } = await registerStart.mutateAsync();
       await selectWorkType.mutateAsync(userId);
-      Alert.alert(
+      toast.success(
         "Worker registered",
         devOtp ?
         `Registration started. Dev OTP: ${devOtp}. The worker must verify this OTP and upload documents from their own phone, then Admin verifies and activates.` :
@@ -40,7 +41,7 @@ export function AddWorkerScreen({ navigation }) {
       );
       navigation.goBack();
     } catch (err) {
-      Alert.alert("Could not register worker", err instanceof Error ? err.message : "Unknown error");
+      toast.error("Could not register worker", err instanceof Error ? err.message : "Unknown error");
     }
   };
 

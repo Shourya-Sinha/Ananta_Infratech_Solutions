@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { View, Text, ScrollView, StyleSheet, TextInput, Alert } from "react-native";
+import { toast } from "@/components/Toast";
+import { View, Text, ScrollView, StyleSheet, TextInput } from "react-native";
 import { Button, ScreenHeader, Card, Badge } from "@/components/ui";
 import { useMyProfile, useMyKharchi, useRequestKharchi, useMyStatement } from "./api";
 import { NetPreview } from "./NetPreview";
@@ -24,7 +25,7 @@ export function RequestKharchiScreen() {
 
   const submit = async () => {
     if (!profile?.currentSite || !amount || !category || !reason) {
-      Alert.alert("Missing information", "Fill in every field before submitting.");
+      toast.warning("Missing information", "Fill in every field before submitting.");
       return;
     }
     try {
@@ -36,12 +37,12 @@ export function RequestKharchiScreen() {
         category,
         reason
       });
-      Alert.alert("Submitted", "Your Kharchi request has been sent for approval.");
+      toast.success("Submitted", "Your Kharchi request has been sent for approval.");
       setAmount("");
       setCategory("");
       setReason("");
     } catch (err) {
-      Alert.alert("Could not submit", err instanceof Error ? err.message : "Unknown error");
+      toast.error("Could not submit", err instanceof Error ? err.message : "Unknown error");
     }
   };
 

@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, StyleSheet, TextInput, Alert } from "react-native";
+import { View, Text, ScrollView, StyleSheet, TextInput } from "react-native";
+import { toast } from "@/components/Toast";
 import { useState } from "react";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { ScreenHeader, Card, Button, EmptyState, Badge } from "@/components/ui";
@@ -22,11 +23,11 @@ export function LeaveScreen() {
 
   const submit = () => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(form.fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(form.toDate)) {
-      return Alert.alert("Enter dates as YYYY-MM-DD", "Example: 2026-08-15");
+      return toast.warning("Enter dates as YYYY-MM-DD", "Example: 2026-08-15");
     }
     request.mutate(form, {
-      onSuccess: () => { setForm({ fromDate: "", toDate: "", leaveType: "PAID", reason: "" }); Alert.alert("Leave requested", "Your manager/admin will approve or reject it."); },
-      onError: (e) => Alert.alert("Could not request", e?.response?.data?.message ?? e.message)
+      onSuccess: () => { setForm({ fromDate: "", toDate: "", leaveType: "PAID", reason: "" }); toast.success("Leave requested", "Your manager/admin will approve or reject it."); },
+      onError: (e) => toast.error("Could not request", e.message)
     });
   };
 

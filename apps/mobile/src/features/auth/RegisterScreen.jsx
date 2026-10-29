@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert, Pressable } from "react-native";
+import { toast } from "@/components/Toast";
+import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import Animated, { FadeInDown, FadeIn, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from "react-native-reanimated";
@@ -66,7 +67,7 @@ export function RegisterScreen({ navigation }) {
 
   const submitForm = () => {
     if (form.password !== form.confirmPassword) {
-      Alert.alert("Passwords don't match", "Please make sure both password fields match.");
+      toast.error("Passwords don't match", "Please make sure both password fields match.");
       return;
     }
     registerStart.mutate(
@@ -75,8 +76,9 @@ export function RegisterScreen({ navigation }) {
         onSuccess: (data) => {
           setDevOtpHint(data.devOtp ?? null);
           setStep("otp");
+          toast.success("Code sent", `Enter the 6-digit code sent to ${form.phone}.`);
         },
-        onError: (err) => Alert.alert("Couldn't register", err instanceof Error ? err.message : "Unknown error"),
+        onError: (err) => toast.error("Couldn't register", err instanceof Error ? err.message : "Unknown error"),
       }
     );
   };
@@ -92,7 +94,7 @@ export function RegisterScreen({ navigation }) {
             { phone: form.phone, password: form.password },
             {
               onError: (err) =>
-                Alert.alert(
+                toast.error(
                   "Verified, but couldn't sign in automatically",
                   (err instanceof Error ? err.message : "Unknown error") + " Please sign in manually."
                 ),
@@ -100,7 +102,7 @@ export function RegisterScreen({ navigation }) {
             }
           );
         },
-        onError: (err) => Alert.alert("Incorrect code", err instanceof Error ? err.message : "Unknown error"),
+        onError: (err) => toast.error("Incorrect code", err instanceof Error ? err.message : "Unknown error"),
       }
     );
   };
