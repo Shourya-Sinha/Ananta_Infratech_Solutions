@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { View, Text, ScrollView, StyleSheet, Alert } from "react-native";
+import { toast } from "@/components/Toast";
+import { View, Text, ScrollView, StyleSheet } from "react-native";
 import { Button, ScreenHeader, Card } from "@/components/ui";
 import { useWorkTypes, useCreateOwnProfile } from "./api";
 import { useLogout } from "@/features/auth/api";
@@ -20,7 +21,7 @@ export function SelectWorkTypeScreen() {
   const submit = () => {
     if (!selected) return;
     createProfile.mutate(selected, {
-      onError: (err) => Alert.alert("Couldn't save", err instanceof Error ? err.message : "Unknown error"),
+      onError: (err) => toast.error("Couldn't save", err instanceof Error ? err.message : "Unknown error"),
     });
   };
 

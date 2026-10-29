@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { View, Text, ScrollView, StyleSheet, TextInput, Alert } from "react-native";
+import { toast } from "@/components/Toast";
+import { View, Text, ScrollView, StyleSheet, TextInput } from "react-native";
 import { Button, ScreenHeader, Card } from "@/components/ui";
 import { useManagedWorkers, useSubmitAdvanceOnBehalf } from "./api";
 import { colors, spacing } from "@/theme";
@@ -13,7 +14,7 @@ export function SubmitAdvanceScreen({ navigation }) {
 
   const onSubmit = async () => {
     if (!workerId || !amount || !reason) {
-      Alert.alert("Missing information", "Select a worker and fill in amount and reason.");
+      toast.warning("Missing information", "Select a worker and fill in amount and reason.");
       return;
     }
     try {
@@ -23,10 +24,10 @@ export function SubmitAdvanceScreen({ navigation }) {
         reason,
         requestedDate: new Date().toISOString().slice(0, 10)
       });
-      Alert.alert("Submitted", "Advance request submitted for admin approval.");
+      toast.success("Submitted", "Advance request submitted for admin approval.");
       navigation.goBack();
     } catch (err) {
-      Alert.alert("Could not submit", err instanceof Error ? err.message : "Unknown error");
+      toast.error("Could not submit", err instanceof Error ? err.message : "Unknown error");
     }
   };
 

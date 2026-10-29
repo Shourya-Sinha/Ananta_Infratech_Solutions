@@ -1,5 +1,6 @@
 import { NavigationContainer } from "@react-navigation/native";
-import { View, ActivityIndicator, Alert } from "react-native";
+import { toast } from "@/components/Toast";
+import { View, ActivityIndicator } from "react-native";
 import { useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { AuthNavigator } from "./AuthNavigator";
@@ -36,7 +37,7 @@ export function RootNavigator() {
     const unsubscribe = subscribeToForegroundMessages((content) => {
       const title = content?.title ?? "New notification";
       const body = content?.body ?? "";
-      Alert.alert(title, body);
+      toast.info(title, body);
     });
     return unsubscribe;
   }, []);

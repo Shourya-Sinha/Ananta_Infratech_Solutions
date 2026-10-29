@@ -1,4 +1,5 @@
-import { Text, StyleSheet, Linking, Alert } from "react-native";
+import { Text, StyleSheet, Linking } from "react-native";
+import { toast } from "@/components/Toast";
 import LinearGradient from "react-native-linear-gradient";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { PressScale } from "@/components/interactive";
@@ -9,7 +10,7 @@ export const WEBSITE_URL = "https://anantainfratechsolutions.com";
 
 export function openWebsite() {
   Linking.openURL(WEBSITE_URL).catch(() =>
-    Alert.alert("Couldn't open website", `Please visit ${WEBSITE_URL} in your browser.`)
+    toast.error("Couldn't open website", `Please visit ${WEBSITE_URL} in your browser.`)
   );
 }
 

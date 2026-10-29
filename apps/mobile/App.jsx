@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ToastHost } from "@/components/Toast";
 import { RootNavigator } from "@/app/RootNavigator";
 import { FinanceSocketSync } from "@/lib/financeSocketSync";
 import { ForceUpdateModal } from "@/components/ForceUpdateModal";
@@ -22,6 +23,7 @@ export default function App() {
         <RootNavigator />
         <ForceUpdateModal />
       </QueryClientProvider>
+      <ToastHost />
     </SafeAreaProvider>
   );
 }

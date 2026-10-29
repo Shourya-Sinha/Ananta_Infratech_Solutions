@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { View, Text, ScrollView, StyleSheet, TextInput, Alert } from "react-native";
+import { toast } from "@/components/Toast";
+import { View, Text, ScrollView, StyleSheet, TextInput } from "react-native";
 import { Button, ScreenHeader, Card, Badge } from "@/components/ui";
 import { useMyProfile, useMyAdvances, useRequestAdvance, useMyStatement } from "./api";
 import { NetPreview } from "./NetPreview";
@@ -21,7 +22,7 @@ export function RequestAdvanceScreen() {
 
   const submit = async () => {
     if (!profile || !amount || !reason) {
-      Alert.alert("Missing information", "Enter an amount and reason.");
+      toast.warning("Missing information", "Enter an amount and reason.");
       return;
     }
     try {
@@ -31,11 +32,11 @@ export function RequestAdvanceScreen() {
         reason,
         requestedDate: new Date().toISOString().slice(0, 10)
       });
-      Alert.alert("Submitted", "Your advance request has been sent for approval.");
+      toast.success("Submitted", "Your advance request has been sent for approval.");
       setAmount("");
       setReason("");
     } catch (err) {
-      Alert.alert("Could not submit", err instanceof Error ? err.message : "Unknown error");
+      toast.error("Could not submit", err instanceof Error ? err.message : "Unknown error");
     }
   };
 

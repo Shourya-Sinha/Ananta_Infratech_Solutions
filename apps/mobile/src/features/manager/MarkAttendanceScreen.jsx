@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { View, Text, ScrollView, StyleSheet, TextInput, Pressable, Alert } from "react-native";
+import { toast } from "@/components/Toast";
+import { View, Text, ScrollView, StyleSheet, TextInput, Pressable } from "react-native";
 import { Button, ScreenHeader, EmptyState } from "@/components/ui";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { useManagedSites, useManagedWorkers, useMarkAttendance } from "./api";
@@ -26,7 +27,7 @@ export function MarkAttendanceScreen() {
     if (!activeSite) return;
     const row = rows[worker._id];
     if (!row?.status) {
-      Alert.alert("Select status", "Mark Present or Absent before saving.");
+      toast.warning("Select status", "Mark Present or Absent before saving.");
       return;
     }
 
@@ -39,7 +40,7 @@ export function MarkAttendanceScreen() {
       overtimeHours: row.status === "PRESENT" ? Number(row.overtimeHours) || 0 : 0
     });
 
-    Alert.alert(
+    toast.success(
       result.queued ? "Saved offline" : "Saved",
       result.queued ? "Will sync once you're back online." : `${worker.user.name} marked ${row.status.toLowerCase()}.`
     );

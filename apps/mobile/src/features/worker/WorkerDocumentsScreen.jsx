@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "@/components/Toast";
 import { View, Text, ScrollView, StyleSheet, Pressable, Alert, ActionSheetIOS, Platform } from "react-native";
 import { launchCamera, launchImageLibrary } from "react-native-image-picker";
 import * as Haptics from "@/lib/haptics";
@@ -26,7 +27,7 @@ async function pickImage(source) {
 
   if (result.didCancel) return { canceled: true, assets: null };
   if (result.errorCode) {
-    Alert.alert(
+    toast.error(
       "Permission needed",
       `Please allow ${source === "camera" ? "camera" : "photo library"} access to upload documents.`
     );
@@ -64,9 +65,9 @@ export function WorkerDocumentsScreen() {
           {
             onSuccess: () => {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert("Uploaded", "Your document was uploaded and is pending admin verification.");
+              toast.success("Uploaded", "Your document was uploaded and is pending admin verification.");
             },
-            onError: (err) => Alert.alert("Upload failed", err instanceof Error ? err.message : "Unknown error"),
+            onError: (err) => toast.error("Upload failed", err instanceof Error ? err.message : "Unknown error"),
           }
         );
       });

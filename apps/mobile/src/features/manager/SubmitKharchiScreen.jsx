@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { View, Text, ScrollView, StyleSheet, TextInput, Alert } from "react-native";
+import { toast } from "@/components/Toast";
+import { View, Text, ScrollView, StyleSheet, TextInput } from "react-native";
 import { Button, ScreenHeader, Card } from "@/components/ui";
 import { useManagedWorkers, useManagedSites, useSubmitKharchiOnBehalf } from "./api";
 import { colors, spacing } from "@/theme";
@@ -18,7 +19,7 @@ export function SubmitKharchiScreen({ navigation }) {
 
   const onSubmit = async () => {
     if (!workerId || !siteId || !amount || !category || !reason) {
-      Alert.alert("Missing information", "Fill in every field before submitting.");
+      toast.warning("Missing information", "Fill in every field before submitting.");
       return;
     }
     try {
@@ -30,10 +31,10 @@ export function SubmitKharchiScreen({ navigation }) {
         category,
         reason
       });
-      Alert.alert("Submitted", "Kharchi request submitted for admin approval.");
+      toast.success("Submitted", "Kharchi request submitted for admin approval.");
       navigation.goBack();
     } catch (err) {
-      Alert.alert("Could not submit", err instanceof Error ? err.message : "Unknown error");
+      toast.error("Could not submit", err instanceof Error ? err.message : "Unknown error");
     }
   };
 

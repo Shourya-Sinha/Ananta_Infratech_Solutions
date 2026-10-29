@@ -1,4 +1,5 @@
 import { View, Text, ScrollView, StyleSheet, TextInput, Alert } from "react-native";
+import { toast } from "@/components/Toast";
 import { useState } from "react";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -23,10 +24,10 @@ export function AnnouncementsScreen() {
   const list = isAdmin && managed ? managed : data;
 
   const publish = () => {
-    if (form.title.trim().length < 3 || form.body.trim().length < 3) return Alert.alert("Add a title and message");
+    if (form.title.trim().length < 3 || form.body.trim().length < 3) return toast.warning("Add a title and message", "Both need at least 3 characters.");
     create.mutate(form, {
-      onSuccess: () => { setForm({ title: "", body: "", audience: "ALL", pinned: false }); setShowForm(false); Alert.alert("Published", "Everyone in the selected audience can now see this notice."); },
-      onError: (e) => Alert.alert("Could not publish", e?.response?.data?.message ?? e.message)
+      onSuccess: () => { setForm({ title: "", body: "", audience: "ALL", pinned: false }); setShowForm(false); toast.success("Published", "Everyone in the selected audience can now see this notice."); },
+      onError: (e) => toast.error("Could not publish", e.message)
     });
   };
 
